@@ -1,5 +1,5 @@
-"""build fixpoint.bmp: a 320x200 bmp whose pixels are a rule 110 universe seeded by
-the machine code that computes it. boot the file and it recomputes itself.
+"""build fixpoint.bmp: a 320x200 bmp whose pixels are a rule 110 universe: the ether,
+disturbed by the machine code that computes it. boot the file and it recomputes itself.
 
   offset  as a bmp                     as x86 / as a disk
   0       "BM"                         inc dx ; dec bp
@@ -7,9 +7,9 @@ the machine code that computes it. boot the file and it recomputes itself.
   10      pixel offset = 1078
   14      info header (top-down)       (bios may patch 11..61 as a floppy bpb; nothing lives there)
   54      palette, 256 x BGRx          the stub, woven between colours
-  446     palette entries 98..113      the partition table: status bytes are a valid 0x80
+  446     palette entries 62..71       the partition table: status bytes are a valid 0x80
   510     palette entry 0x72           55 AA, the boot signature
-  1078    pixels                       row 0 ends with the program
+  1078    pixels                       row 0: the ether, then the program
   65078   padding, then a zip          the source, so `unzip fixpoint.bmp` works
 
 usage: python3 build.py   (needs nasm and numpy). writes fixpoint.bmp and stub.asm.
