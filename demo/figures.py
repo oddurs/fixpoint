@@ -173,13 +173,13 @@ def anatomy():
     t = Type()
     path = trace()
     o = []
-    W = X0 + COLS * EW + 196
+    W = X0 + COLS * EW + 206
     line = lambda x1, y1, x2, y2, w=RULE, c=INK, extra="": o.append(
         '<path d="M%.2f %.2fL%.2f %.2f" stroke="%s" stroke-width="%s" fill="none"%s/>'
         % (x1, y1, x2, y2, c, w, extra))
 
     # --- (a) the header
-    o.append(t.runs(X0, Y_HEAD - 34, [("(a)", "cmb10"), ("  Headers, bytes 0–53", "cmr10")], 11))
+    o.append(t.runs(X0, Y_HEAD - 34, [("(a)", "cmb10"), ("  Headers, bytes 0–53", "cmr10")], 12))
     executed = {b for off, n, _ in path for b in range(off, off + n)}
     for off in range(PAL):
         x = X0 + off * HB
@@ -195,13 +195,13 @@ def anatomy():
                  % (x1, Y_HEAD, x2 - x1, HH, INK, RULE))
         face = "cmtt10" if label.startswith("bf") else "cmr10"
         if b - a <= 4:                                     # small fields: named above the strip
-            o.append(t.text((x1 + x2) / 2, Y_HEAD - 6, label, face, 8, "middle", GREY))
+            o.append(t.text((x1 + x2) / 2, Y_HEAD - 6, label, face, 8.8, "middle", GREY))
         else:                                              # the info header: bracketed below
             y = Y_HEAD + HH + 17
             line(x1 + 1, y, x1 + 1, y + 3)
             line(x2 - 1, y, x2 - 1, y + 3)
             line(x1 + 1, y + 3, x2 - 1, y + 3)
-            o.append(t.text((x1 + x2) / 2, y + 15, label, face, 8.6, "middle", GREY))
+            o.append(t.text((x1 + x2) / 2, y + 16, label, face, 9.6, "middle", GREY))
     for off in (0, 2, 6, 10, 14, 54):
         x = X0 + off * HB
         line(x, Y_HEAD + HH, x, Y_HEAD + HH + 3)
@@ -209,16 +209,16 @@ def anatomy():
 
     # --- (b) the palette
     yb = Y_GRID - 30
-    o.append(t.runs(X0, yb, [("(b)", "cmb10"), ("  Palette, bytes 54–511", "cmr10")], 11))
+    o.append(t.runs(X0, yb, [("(b)", "cmb10"), ("  Palette, bytes 54–511", "cmr10")], 12))
     for c in range(COLS):
-        o.append(t.text(X0 + c * EW + EW / 2, Y_GRID - 7, "%X" % c, "cmtt10", 8.6, "middle", GREY))
-    o.append(t.text(X0 - 38, Y_GRID - 7, "entry", "cmr10", 8.6, "middle", GREY))
-    o.append(t.text(X0 - 10, Y_GRID - 7, "byte", "cmr10", 8.6, "end", GREY))
+        o.append(t.text(X0 + c * EW + EW / 2, Y_GRID - 7, "%X" % c, "cmtt10", 9.4, "middle", GREY))
+    o.append(t.text(X0 - 40, Y_GRID - 7, "entry", "cmr10", 9.4, "middle", GREY))
+    o.append(t.text(X0 - 8, Y_GRID - 7, "byte", "cmr10", 9.4, "end", GREY))
     last = (SECTOR - 1 - PAL) // 4                        # 0x72: the last entry the sector reaches
     for r in range(ROWS):
         y = Y_GRID + r * EH
-        o.append(t.text(X0 - 38, y + EH / 2 + 3, "%X0" % r, "cmtt10", 8.6, "middle", GREY))
-        o.append(t.text(X0 - 10, y + EH / 2 + 3, str(PAL + 4 * COLS * r), "cmr10", 8.6, "end", GREY))
+        o.append(t.text(X0 - 40, y + EH / 2 + 3, "%X0" % r, "cmtt10", 9.4, "middle", GREY))
+        o.append(t.text(X0 - 8, y + EH / 2 + 3, str(PAL + 4 * COLS * r), "cmr10", 9.4, "end", GREY))
         for c in range(COLS):
             e = r * COLS + c
             x = X0 + c * EW
@@ -232,7 +232,7 @@ def anatomy():
     x512, y512 = byte_xy(SECTOR)
     xs = x512 - EW / 8
     line(xs, y512 - EH / 2 - 5, xs, y512 + EH / 2 + 5, 1.1)
-    o.append(t.text(xs, y512 + EH / 2 + 16, "byte 512: end of the boot sector", "cmr10", 8.6, "middle", GREY))
+    o.append(t.text(xs, y512 + EH / 2 + 16, "byte 512: end of the boot sector", "cmr10", 9.4, "middle", GREY))
 
     # the boot sector's demands, outlined
     for off in STATUS:
@@ -280,7 +280,7 @@ def anatomy():
     # --- annotations in the right margin
     ax = xr + 30
 
-    def note(y, runs, size=8.6):
+    def note(y, runs, size=9.6):
         o.append(t.runs(ax, y, runs, size, GREY))
 
     seg, offs = (int(v, 16) for v in path[-1][2].split()[-1].split(":"))
@@ -313,9 +313,9 @@ def anatomy():
          "the bootloader leaves alone. Outlined: the four partition status bytes and the boot "
          "signature, which the disk format fixes and the palette absorbs."
          % (len(path), code, touched, len(jumps) - 1), "cmr10"),
-    ], size=10, leading=13.5)
+    ], size=11.2, leading=15)
     o.append(cap)
-    H = yc + n * 13.5 + 14
+    H = yc + n * 15 + 14
 
     defs = "".join('<path id="%s" d="%s"/>' % (gid, d) for gid, d in sorted(t.defs.items()))
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '

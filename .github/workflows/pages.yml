@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the file listing shows when each file last changed
       - uses: actions/setup-node@v4
         with:
           node-version: 22

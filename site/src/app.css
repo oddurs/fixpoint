@@ -1,129 +1,387 @@
-@import 'highlight.js/styles/github.css' (prefers-color-scheme: light);
-@import 'highlight.js/styles/github-dark.css' (prefers-color-scheme: dark);
+/* a home page a professor might have set in 2003: latin modern, a text block of
+   about 66 characters, justified and hyphenated, numbered sections, booktabs
+   tables, and links that are blue and underlined because that is what links are. */
+
+@font-face {
+	font-family: 'FP LM Roman';
+	src: url('./fonts/fp-lmroman10-regular.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'FP LM Roman';
+	src: url('./fonts/fp-lmroman10-italic.woff2') format('woff2');
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'FP LM Roman';
+	src: url('./fonts/fp-lmroman10-bold.woff2') format('woff2');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'FP LM Roman';
+	src: url('./fonts/fp-lmroman10-bolditalic.woff2') format('woff2');
+	font-weight: 700;
+	font-style: italic;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'FP LM Roman Caps';
+	src: url('./fonts/fp-lmromancaps10-regular.woff2') format('woff2');
+	font-display: swap;
+}
+@font-face {
+	font-family: 'FP LM Mono';
+	src: url('./fonts/fp-lmmono10-regular.woff2') format('woff2');
+	font-display: swap;
+}
 
 :root {
-	--bg: #ffffff;
-	--fg: #1f2328;
-	--muted: #59636e;
-	--border: #d1d9e0;
-	--header: #f6f8fa;
-	--btn: #f6f8fa;
-	--btn-hover: #eff2f5;
-}
-@media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #0d1117;
-		--fg: #f0f6fc;
-		--muted: #9198a1;
-		--border: #3d444d;
-		--header: #151b23;
-		--btn: #212830;
-		--btn-hover: #262c36;
-	}
+	--ink: #111;
+	--grey: #555;
+	--rule: #111;
+	--paper: #fff;
+	--link: #0000ee;
+	--visited: #551a8b;
+	--cardinal: #8c1515;
+	--serif: 'FP LM Roman', 'Latin Modern Roman', 'CMU Serif', 'Times New Roman', Times, serif;
+	--caps: 'FP LM Roman Caps', 'Latin Modern Roman Caps', var(--serif);
+	--mono: 'FP LM Mono', 'Latin Modern Mono', 'CMU Typewriter Text', 'Courier New', monospace;
+	color-scheme: light;
 }
 
-html,
+html {
+	background: var(--paper);
+	color: var(--ink);
+	-webkit-text-size-adjust: 100%;
+}
 body {
 	margin: 0;
-	background: var(--bg);
-	color: var(--fg);
+	font: 19px/1.5 var(--serif);
+	font-kerning: normal;
+	font-variant-ligatures: common-ligatures;
+	text-rendering: optimizeLegibility;
+}
+
+a {
+	color: var(--link);
+}
+a:visited {
+	color: var(--visited);
+}
+
+.tt,
+code,
+pre {
+	font-family: var(--mono);
+	font-size: 0.94em;
+}
+
+/* --- the masthead: verdana, small, the way departmental pages were */
+.masthead {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 4px 16px;
+	padding: 6px 16px 7px;
+	border-top: 5px solid var(--cardinal);
+	border-bottom: 1px solid #ccc;
+	background: #f4f4f0;
+	font: 12px/1.4 Verdana, Geneva, Tahoma, sans-serif;
+	color: #333;
 }
 
 main {
 	box-sizing: border-box;
-	max-width: 1012px;
+	max-width: 42rem;
 	margin: 0 auto;
-	padding: 24px 16px 64px;
+	padding: 48px 16px 64px;
 }
 
-nav {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 12px;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 16px;
-	font: 20px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+/* --- \maketitle */
+.maketitle {
+	text-align: center;
+	margin: 12px 0 28px;
 }
-nav a {
-	color: var(--fg);
-	text-decoration: none;
+.maketitle h1 {
+	max-width: 15em;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	text-wrap: balance;
+	font-weight: 400;
+	font-size: 1.72em;
+	line-height: 1.25;
+	margin: 0 0 22px;
 }
-nav .owner {
-	color: var(--muted);
+.maketitle h1 .tt {
+	font-size: 1em;
 }
-nav .repo:hover strong {
-	text-decoration: underline;
-}
-.actions {
-	display: flex;
-	gap: 8px;
-}
-.btn {
-	font-size: 12px;
-	font-weight: 500;
-	line-height: 20px;
-	padding: 3px 12px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: var(--btn);
-}
-.btn:hover {
-	background: var(--btn-hover);
+.maketitle p {
+	margin: 0 0 6px;
+	font-size: 1.12em;
 }
 
-.box {
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	overflow: hidden;
-}
-.box-header {
-	padding: 8px 16px;
-	border-bottom: 1px solid var(--border);
-	background: var(--header);
-	font: 600 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+.epigraph {
+	margin: 0 0 28px auto;
+	width: 60%;
+	font-style: italic;
+	text-align: right;
+	padding-bottom: 6px;
+	border-bottom: 0.5px solid var(--rule);
 }
 
-.markdown-body {
-	box-sizing: border-box;
-	padding: 32px;
+/* --- \begin{abstract} */
+.abstract {
+	margin: 0 2.4em 30px;
+	font-size: 0.9em;
+	text-align: justify;
+	hyphens: auto;
 }
-.markdown-body video {
+.abstract h2 {
+	font-size: 1em;
+	font-weight: 700;
+	text-align: center;
+	margin: 0 0 6px;
+}
+.abstract p {
+	margin: 0;
+	text-indent: 1.5em;
+}
+
+/* --- figures. a figure may be wider than the text, like figure* in two-column latex */
+figure {
+	margin: 28px 0 30px;
+}
+figure.wide,
+.paper p:has(> img[src$='.svg']) {
+	width: min(calc(100vw - 32px), 960px);
+	margin-left: 50%;
+	transform: translateX(-50%);
+}
+figure video {
 	display: block;
 	width: 100%;
 	height: auto;
 	aspect-ratio: 16 / 10;
-	margin-bottom: 24px;
-	border-radius: 6px;
 	background: #000;
 }
-/* the readme's code blocks are highlighted by hljs; let github-markdown-css own the box */
-.markdown-body pre code.hljs {
-	padding: 0;
-	background: transparent;
+figcaption {
+	max-width: 42rem;
+	margin: 10px auto 0;
+	padding: 0 16px;
+	box-sizing: border-box;
+	font-size: 0.84em;
+	line-height: 1.4;
+	text-align: justify;
+	hyphens: auto;
+}
+.paper p:has(> img[src$='.svg']) {
+	overflow-x: auto;
+	text-indent: 0;
+	margin-top: 28px;
+	margin-bottom: 28px;
+}
+.paper img {
+	max-width: 100%;
+}
+.paper img[src$='.svg'] {
+	display: block;
+	width: 100%;
+	min-width: 720px;
+	height: auto;
 }
 
-/* the anatomy figure is a diagram, not a photo: on a phone, scroll it rather than shrink it */
-.markdown-body p:has(> img[src$='.svg']) {
-	overflow-x: auto;
+.noindent {
+	margin: 0 0 4px;
 }
-@media (max-width: 767px) {
-	.markdown-body img[src$='.svg'] {
-		max-width: none;
-		width: 720px;
+
+pre {
+	margin: 10px 0 22px;
+	padding: 0 0 0 1.5em;
+	line-height: 1.35;
+	overflow-x: auto;
+	white-space: pre;
+	background: none;
+}
+pre.commands,
+pre.bibtex,
+.paper pre {
+	font-size: 0.86em;
+}
+@media (min-width: 1100px) {
+	.paper pre {
+		margin-right: -12rem;              /* an overfull hbox, on purpose */
+	}
+}
+
+/* --- \tableofcontents */
+.contents {
+	margin: 34px 0 10px;
+}
+.contents h2 {
+	font-size: 1.3em;
+	margin: 0 0 10px;
+}
+.contents ol {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.contents li {
+	display: flex;
+	margin: 2px 0;
+}
+.contents .num {
+	flex: 0 0 2.2em;
+}
+.contents li.level2 {
+	font-weight: 700;
+	margin-top: 8px;
+}
+.contents li.level3 {
+	padding-left: 2.2em;
+}
+.contents li.level3 .num {
+	flex-basis: 2.6em;
+}
+.contents a,
+.contents a:visited {
+	color: var(--ink);
+	text-decoration: none;
+}
+.contents a:hover {
+	text-decoration: underline;
+}
+
+/* --- the paper: numbered sections, justified text, indented paragraphs */
+.paper {
+	text-align: justify;
+	hyphens: auto;
+}
+.paper h2,
+.paper h3 {
+	display: flex;
+	text-align: left;
+	hyphens: manual;
+	line-height: 1.25;
+}
+.paper h2 {
+	font-size: 1.3em;
+	margin: 40px 0 12px;
+}
+.paper h3 {
+	font-size: 1.08em;
+	margin: 28px 0 8px;
+}
+.paper h2::first-letter,
+.paper h3::first-letter {
+	text-transform: uppercase;
+}
+.secnum {
+	flex: 0 0 2.2em;                       /* a hanging indent, as latex sets section titles */
+}
+.paper h3 .secnum {
+	flex-basis: 2.6em;
+}
+.paper p {
+	margin: 0;
+}
+.paper p + p {
+	text-indent: 1.5em;
+}
+.paper ul {
+	margin: 8px 0 12px;
+	padding-left: 1.5em;
+}
+.paper li {
+	margin: 4px 0;
+}
+.paper code {
+	font-size: 0.94em;
+}
+
+/* listings-style highlighting: keywords bold, comments italic, nothing coloured */
+.hljs-keyword,
+.hljs-built_in {
+	font-weight: 700;
+}
+.hljs-comment {
+	font-family: var(--serif);
+	font-style: italic;
+	color: var(--grey);
+}
+
+/* --- booktabs: three rules, no verticals, no stripes */
+table {
+	border-collapse: collapse;
+	margin: 18px auto 22px;
+	font-size: 0.86em;
+	line-height: 1.35;
+	text-align: left;
+	hyphens: manual;
+}
+thead tr {
+	border-top: 1.5px solid var(--rule);
+	border-bottom: 0.75px solid var(--rule);
+}
+tbody tr:last-child {
+	border-bottom: 1.5px solid var(--rule);
+}
+th {
+	font-weight: 400;
+	font-style: italic;
+}
+th,
+td {
+	padding: 4px 12px;
+	vertical-align: top;
+}
+th:first-child,
+td:first-child {
+	padding-left: 4px;
+}
+.r {
+	text-align: right;
+}
+table.listing td:nth-child(2),
+table.listing td:nth-child(3) {
+	white-space: nowrap;
+}
+
+footer {
+	margin-top: 56px;
+	font-size: 0.8em;
+	color: var(--grey);
+}
+footer hr {
+	border: 0;
+	border-top: 0.5px solid var(--rule);
+	margin: 0 0 10px;
+}
+footer p {
+	margin: 0;
+}
+
+@media (max-width: 640px) {
+	body {
+		font-size: 17px;
 	}
 	main {
-		padding: 16px 0 48px;
+		padding-top: 28px;
 	}
-	nav {
-		padding: 0 16px;
+	.abstract {
+		margin: 0 0 26px;
 	}
-	.box {
-		border-left: 0;
-		border-right: 0;
-		border-radius: 0;
+	.epigraph {
+		width: 80%;
 	}
-	.markdown-body {
-		padding: 16px;
+	.paper table {
+		display: block;
+		overflow-x: auto;
 	}
 }
