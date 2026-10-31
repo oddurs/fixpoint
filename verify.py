@@ -3,12 +3,16 @@
   - it is a valid bmp: pillow, ffmpeg and chrome all decode it to the same pixels
   - it is a valid boot sector: 55 AA, legal partition status bytes, zero reserved fields
   - it carries its source: the zip in its padding matches the files in this repo
+  - it is a rule 110 universe: every row follows from the one above it
+  - its dark cells are exactly the cells the program has not reached
   - it is a fixed point: booted in qemu, the screen equals the image, pixel for pixel
 
-needs pillow and qemu-system-i386. ffmpeg and chrome are checked when installed.
+needs numpy, pillow and qemu-system-i386. ffmpeg and chrome are checked when installed.
 usage: python3 verify.py [fixpoint.bmp]
 """
 import io, os, shutil, socket, struct, subprocess, sys, tempfile, time, zipfile
+
+import numpy as np
 from PIL import Image
 
 W, H = 320, 200
@@ -67,6 +71,16 @@ def boot(path, timeout=30):
         qemu.wait()
 
 
+def rule110(row0):
+    """the tape, written independently of build.py: cell i = rule 110 of i-321, i-320, i-319."""
+    t = np.zeros(W * H, np.uint8)
+    t[:W] = row0
+    for i in range(W + 1, W * H):
+        l, c, r = int(t[i - W - 1]), int(t[i - W]), int(t[i - W + 1])
+        t[i] = (c | r) & ~(l & c & r) & 0xFF
+    return t
+
+
 def chrome_decode(path, tmp):
     exe = next((c for c in CHROME if shutil.which(c)), None)
     if not exe:
@@ -119,6 +133,22 @@ def main():
           " ".join("%02X" % s for s in status))
     check("first instruction jumps into the palette", data[2] == 0xEB and 62 <= 4 + data[3] < 1078,
           f"jmp short to offset {4 + data[3]}")
+
+    print("as a picture")
+    pixels = np.frombuffer(ref.tobytes(), np.uint8)
+    check("every row follows from the row above by rule 110",
+          (rule110(pixels[:W]) == pixels).all())
+    row0 = pixels[:W]
+    x0 = next(x for x in range(14, W) if row0[x] != row0[x - 14])
+    check("row 0 is the ether, then the program", set(row0[:x0].tolist()) <= {0, 255},
+          f"ether x=0..{x0 - 1}, program x={x0}..{W - 1}")
+    untouched = rule110(np.resize(row0[:14], W))          # the universe without the program
+    reached = pixels != untouched
+    agree = np.isin(pixels, [0, 255])
+    check("every cell the program hasn't reached is dark", not (~reached & ~agree).any(),
+          f"{(~reached).sum()} cells")
+    print(f"        the program reaches {reached.sum()} cells ({reached.mean():.1%}); "
+          f"{(reached & agree).sum()} of them are dark by coincidence ({(reached & agree).sum() / reached.sum():.2%})")
 
     print("as an archive")
     try:

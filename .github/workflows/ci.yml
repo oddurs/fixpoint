@@ -18,8 +18,10 @@ jobs:
           sudo apt-get install -y nasm qemu-system-x86 ffmpeg
           pip install -r requirements.txt
       - name: rebuild from source
-        run: python3 build.py
-      - name: the committed image is exactly what the source builds
-        run: git diff --exit-code -- fixpoint.bmp stub.asm
+        run: |
+          python3 build.py
+          python3 demo/anatomy.py
+      - name: the committed image and figure are exactly what the source builds
+        run: git diff --exit-code -- fixpoint.bmp stub.asm anatomy.svg
       - name: check every claim (decoders, disk, archive) and boot it
         run: python3 verify.py

@@ -59,32 +59,51 @@ def build_main():
 
 # ------------------------------------------------------------------ the picture
 
+ETHER_LEN = 14                       # main.asm ends with one period of the ether
+LIGHT = 6                            # the universe whose life sets the light
+
+
 def universe(program, x0):
-    """exactly what the loop in main.asm computes."""
-    m = bytearray(W * H)
-    m[x0:W] = program
-    for i in range(W + 1, W * H):
-        l, c, r = m[i - W - 1], m[i - W], m[i - W + 1]
-        m[i] = (c | r) & ~(l & c & r) & 0xFF
-    return m
+    """exactly what main.asm computes: row 0 is the ether then the program, and each
+    cell after 320 is rule 110 of the cells 321, 320 and 319 places back."""
+    ether = program[-ETHER_LEN:]
+    m = np.zeros(W * H, np.uint8)
+    m[:x0] = np.resize(np.frombuffer(ether, np.uint8), x0)
+    m[x0:W] = np.frombuffer(program, np.uint8)
+    rule = lambda l, c, r: (c | r) & ~(l & c & r)
+    for y in range(1, H):
+        i = W * y + (1 if y == 1 else 0)          # cell 320 has no left neighbour; it stays 0
+        j = W * y + W - 1                         # the last cell's right neighbour is in this row
+        m[i:j] = rule(m[i - W - 1:j - W - 1], m[i - W:j - W], m[i - W + 1:j - W + 1])
+        m[j] = rule(m[j - W - 1], m[j - W], m[j - W + 1])
+    return bytes(m)
 
 
 def palette():
-    """an indigo-to-peach value ramp, bent where the boot sector needs it."""
-    stops = [(0x00, (4, 6, 14)), (0x5A, (28, 38, 92)), (0x9E, (120, 96, 170)),
-             (0xD9, (236, 170, 120)), (0xFF, (255, 246, 228))]
+    """the picture's meaning is in its palette.
 
-    def ramp(v):
-        for (a, ca), (b, cb) in zip(stops, stops[1:]):
-            if v <= b:
-                t = (v - a) / (b - a)
-                return [round(ca[k] + (cb[k] - ca[k]) * t) for k in range(3)]
+    row 0 starts out the same in all eight universes except where the program is, so
+    a cell where all eight agree (00 or FF) is one the program has not reached: the
+    ether, drawn as two close, quiet shades. a cell where they disagree is in the
+    program's causal future: universe 6 decides whether it is light or dark there,
+    and the other seven decide its hue."""
+    def mix(a, b, t):
+        return [round(a[k] + (b[k] - a[k]) * t) for k in range(3)]
 
-    pal = [ramp(v) for v in range(256)]
-    # the boot signature is the blue and green of entry 0x72: it becomes an orange highlight
-    pal[0x72] = [0xFF, 0xAA, 0x55]
-    # partition status bytes are blue channels; snap each to the nearer legal value
-    for off in MBR_STATUS:
+    pal = []
+    for v in range(256):
+        if v in (0x00, 0xFF):
+            pal.append([10, 12, 22] if v == 0 else [22, 26, 46])
+            continue
+        others = bin(v & ~(1 << LIGHT) & 0xFF).count("1") / 7
+        if v >> LIGHT & 1:
+            pal.append(mix((255, 120, 96), (255, 214, 140), others))   # alive: coral to gold
+        else:
+            pal.append(mix((58, 44, 120), (150, 70, 140), others))     # dead: indigo to plum
+    # the boot sector's demands. bit 6 is set in all five entries, so each is already a
+    # warm colour, and the changes are small:
+    pal[0x72][1:] = [0xAA, 0x55]                     # 55 AA, the signature: blue and green
+    for off in MBR_STATUS:                           # partition status: blue must be 00 or 80
         e = (off - PAL) // 4
         pal[e][2] = 0x80 if pal[e][2] >= 0x40 else 0x00
     return pal
@@ -253,9 +272,7 @@ def source_zip(prefix_len):
 def main():
     program, x0, main_org = build_main()
     m = universe(program, x0)
-    hist = [0] * 256
-    for b in m:
-        hist[b] += 1
+    hist = np.bincount(np.frombuffer(m, np.uint8), minlength=256).tolist()
 
     pal = palette()
     clash, start, moves, units, enc, fill = place_stub(pal, hist, main_org)

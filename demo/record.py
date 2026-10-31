@@ -1,9 +1,9 @@
 """record the demo video: real qemu frames of fixpoint.bmp booting.
 
-the computation takes microseconds, so qemu runs with -icount shift=10,align=on,
-which pins the emulated cpu to about one million instructions per second of real
-time. the frames are screendumps taken as fast as the monitor allows; nothing is
-interpolated. needs qemu-system-i386, ffmpeg, and pillow.
+the bios is captured in real time. the computation takes a fraction of a second,
+so it is captured under gdb: a breakpoint on the program's own loop pauses the
+machine every two rows, and qemu dumps the screen from there. nothing is rendered
+or interpolated: every frame is the real screen of the real machine. needs qemu-system-i386, gdb, ffmpeg, and pillow.
 
 usage: python3 demo/record.py   (from the repo root)
 writes site/static/demo.mp4 and site/static/poster.png
@@ -18,41 +18,96 @@ BG = (13, 17, 23)
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono%s.ttf"
 
 
-def capture(seconds=11):
+class Monitor:
+    """a qemu monitor on a unix socket: send a command, wait for the next prompt."""
+
+    def __init__(self, path):
+        self.s = socket.socket(socket.AF_UNIX)
+        for _ in range(200):
+            try:
+                self.s.connect(path)
+                break
+            except OSError:
+                time.sleep(0.02)
+        self.s.settimeout(10)
+        self.read()
+
+    def read(self):
+        buf = b""
+        while not buf.rstrip().endswith(b"(qemu)"):
+            buf += self.s.recv(65536)
+        return buf
+
+    def __call__(self, cmd):
+        self.s.send(cmd.encode() + b"\n")
+        return self.read()
+
+
+def capture_boot(step=0.1, limit=600):
+    """the bios, in real time: screendumps until the program switches to mode 13h."""
     tmp = tempfile.mkdtemp()
     sock = os.path.join(tmp, "mon.sock")
     qemu = subprocess.Popen([
         "qemu-system-i386", "-drive", f"format=raw,file={BMP},if=ide", "-display", "none",
         "-monitor", f"unix:{sock},server,nowait", "-no-reboot",
         "-icount", "shift=10,align=on,sleep=on"], stderr=subprocess.DEVNULL)
-    s = socket.socket(socket.AF_UNIX)
-    for _ in range(100):
-        try:
-            s.connect(sock)
-            break
-        except OSError:
-            time.sleep(0.02)
-    s.setblocking(False)
-    frames, t0, n = [], time.time(), 0
+    frames = []
     try:
-        while time.time() - t0 < seconds:
+        mon = Monitor(sock)
+        for n in range(limit):
             path = os.path.join(tmp, f"{n:05d}.ppm")
-            s.send(f"screendump {path}\n".encode())
-            while not (os.path.exists(path) and os.path.getsize(path) > 15):
-                time.sleep(0.002)
-            time.sleep(0.01)
-            try:
-                while s.recv(65536):
-                    pass
-            except BlockingIOError:
-                pass
-            frames.append(path)
-            n += 1
+            mon("screendump " + path)
+            frame = Image.open(path).convert("RGB")
+            if frame.size == (640, 400):
+                break
+            frames.append(frame)
+            time.sleep(step)
     finally:
         qemu.kill()
         qemu.wait()
-    # decode only after qemu is gone: a screendump may still be mid-write while we poll
-    return [Image.open(p).convert("RGB") for p in frames]
+    return frames
+
+
+def capture_compute(rows_per_frame=2):
+    """the computation, under a debugger: a breakpoint on the program's own loop test
+    pauses the real machine every few rows, and qemu dumps the screen from there."""
+    data = open(BMP, "rb").read()
+    loop = data.index(bytes.fromhex("81FF00FA"), 1078, 1078 + 320)   # cmp di, 64000
+    addr = 0x8000 + loop                                             # where the stub loads it
+    tmp = tempfile.mkdtemp()
+    script = os.path.join(tmp, "capture.gdb")
+    with open(script, "w") as f:
+        f.write(f"""set pagination off
+set confirm off
+target remote localhost:1234
+set $n = 0
+break *{addr:#x} if ($edi & 0xffff) % {320 * rows_per_frame} == 0
+commands
+silent
+eval "monitor screendump {tmp}/c%05d.ppm", $n
+set $n = $n + 1
+continue
+end
+break *{addr + 6:#x}
+commands
+silent
+eval "monitor screendump {tmp}/c%05d.ppm", $n
+kill
+quit
+end
+continue
+""")
+    qemu = subprocess.Popen([
+        "qemu-system-i386", "-drive", f"format=raw,file={BMP},if=ide", "-display", "none",
+        "-no-reboot", "-s", "-S"], stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(["gdb", "-batch", "-nx", "-x", script], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=600)
+    finally:
+        qemu.kill()
+        qemu.wait()
+    paths = sorted(p for p in os.listdir(tmp) if p.endswith(".ppm"))
+    return [Image.open(os.path.join(tmp, p)).convert("RGB") for p in paths]
 
 
 def distinct(frames):
@@ -88,10 +143,9 @@ def caption(im, title, sub):
 
 
 def main():
-    raw = capture()
-    bios = distinct([f for f in raw if f.size != (640, 400)])[1:]   # text mode: seabios
-    comp = distinct([f for f in raw if f.size == (640, 400)])       # mode 13h: the computation
-    assert bios and len(comp) > 5, "capture missed the boot; run again"
+    bios = distinct(capture_boot())[1:]          # text mode: seabios
+    comp = distinct(capture_compute())           # mode 13h: the computation, two rows a frame
+    assert bios and len(comp) > 50, "capture missed the boot; run again"
 
     out = []
     hold = lambda im, sec: out.extend([im] * round(sec * FPS))
@@ -108,10 +162,12 @@ def main():
 
     for im in bios:
         hold(caption(fit(im), "booting", "the same file, as a disk"), 1.6 / len(bios))
+    per = 4.0 / len(comp)                        # the fill plays in four seconds
     for im in comp:
-        hold(caption(fit(im), "computing", "real frames, cpu throttled to ~1 MIPS"), 0.13)
+        hold(caption(fit(im), "computing", "real frames, paused every two rows"), per)
     final = fit(comp[-1])
-    hold(caption(final, "booted", "rule 110, seeded by its own code"), 2.2)
+    hold(caption(final, "booted", "rule 110, disturbed by its own code"), 2.2)
+    hold(caption(final, "dark", "everywhere the program hasn't reached"), 2.2)
     hold(caption(final, "64000/64000 pixels", "identical to the image"), 2.4)
 
     os.makedirs(OUT, exist_ok=True)

@@ -1,9 +1,14 @@
-; main.asm — the last pixels of row 0. this code is the seed of the universe it draws.
+; main.asm: the last pixels of row 0. this code is the seed of the universe it draws.
 ;
 ; the whole screen is one tape, 64000 cells long. each cell is a byte, so it holds
-; eight independent rule 110 universes, one per bit. cell i is computed from cells
-; i-321, i-320 and i-319: the three cells above it, one row of 320 back.
-; rule 110 is turing-complete.
+; eight rule 110 universes, one per bit. cell i is computed from cells i-321, i-320
+; and i-319: the three cells above it, one row of 320 back. rule 110 is
+; turing-complete.
+;
+; row 0 is rule 110's ether, a background that repeats every 14 cells and is the
+; same in all eight universes, followed by this program. the program's bits differ
+; from universe to universe, so it is the only thing that can make them disagree.
+; every cell where they disagree is in the program's causal future.
 ;
 ; assembled by build.py with ORG (where this lands in memory) and X0 (where it
 ; lands in row 0) defined, so that it ends exactly at the end of the row.
@@ -41,10 +46,18 @@ main:
     mov si, main
     mov di, X0
     mov cx, LEN
-    rep movsb               ; row 0 is the program
+    rep movsb               ; the end of row 0 is this program
+    mov si, ether
+    xor di, di
+    mov cl, 14
+    rep movsb               ; the start of row 0 is one period of the ether
 
     push es
     pop ds
+    xor si, si
+    mov cx, X0 - 14
+    rep movsb               ; which copies itself across the rest of the row
+
     mov di, 321             ; cell 320 has no left neighbour on the tape; it stays 0
 .cell:
     mov al, [di-321]        ; left
@@ -63,5 +76,9 @@ main:
 .halt:
     hlt
     jmp .halt
+
+ether:                      ; 10111110001001: one period, the same in all eight universes
+    db 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+    db 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF
 
 LEN equ $ - main

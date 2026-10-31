@@ -4,8 +4,8 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "prebuild": "cp ../fixpoint.bmp static/",
-    "predev": "cp ../fixpoint.bmp static/"
+    "prebuild": "cp ../fixpoint.bmp ../anatomy.svg static/",
+    "predev": "cp ../fixpoint.bmp ../anatomy.svg static/"
   },
   "private": "true",
   "type": "module",
