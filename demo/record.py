@@ -166,8 +166,8 @@ def main():
     for im in comp:
         hold(caption(fit(im), "computing", "real frames, paused every two rows"), per)
     final = fit(comp[-1])
-    hold(caption(final, "booted", "rule 110, disturbed by its own code"), 2.2)
-    hold(caption(final, "dark", "everywhere the program hasn't reached"), 2.2)
+    hold(caption(final, "booted", "the same picture, drawn again without looking"), 2.2)
+    hold(caption(final, "dark", "where the program hasn't reached. yet."), 2.2)
     hold(caption(final, "64000/64000 pixels", "identical to the image"), 2.4)
 
     os.makedirs(OUT, exist_ok=True)

@@ -9,7 +9,7 @@
 	const site = 'https://oddurs.github.io/fixpoint';
 	const title = 'fixpoint — an 88 KB image that boots and computes itself';
 	const description =
-		'A 320×200 BMP that is also a boot sector. Boot it and the CPU recomputes the picture: Rule 110 in its ether, and the light cone of the program that disturbs it.';
+		'a picture of its own consequences. a 320×200 bmp that is also a boot sector: boot it and it draws itself again. rule 110, its ether, and the light cone of a program hiding in the top row.';
 </script>
 
 <svelte:head>
