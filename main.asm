@@ -1,15 +1,20 @@
 ; main.asm — the last pixels of row 0. this code is the seed of the universe it draws.
 ;
 ; the whole screen is one tape, 64000 cells long. each cell is a byte, so it holds
-; eight independent rule 110 universes, one per bit. cell i is computed from the
-; three cells one row (320 cells) above it. rule 110 is turing-complete.
+; eight independent rule 110 universes, one per bit. cell i is computed from cells
+; i-321, i-320 and i-319: the three cells above it, one row of 320 back.
+; rule 110 is turing-complete.
+;
+; assembled by build.py with ORG (where this lands in memory) and X0 (where it
+; lands in row 0) defined, so that it ends exactly at the end of the row.
 bits 16
 org ORG
 
 main:
+    cld                     ; string ops go forward; don't trust the BIOS to say so
     push cs
     pop ds                  ; ds = 0, where the stub loaded the file
-    mov ax, 0x0013          ; 320x200, 256 colours
+    mov ax, 0x0013          ; 320x200, 256 colours; clears the screen
     int 0x10
 
     mov dx, 0x3C8           ; the BMP's palette becomes the VGA palette
@@ -19,8 +24,8 @@ main:
     mov si, 0x8000 + 54
     mov cx, 256
 .pal:
-    mov al, [si+2]
-    shr al, 2
+    mov al, [si+2]          ; BMP stores B, G, R, x; the DAC wants R, G, B
+    shr al, 2               ; and 6 bits per channel
     out dx, al
     mov al, [si+1]
     shr al, 2
@@ -40,7 +45,7 @@ main:
 
     push es
     pop ds
-    mov di, 320
+    mov di, 321             ; cell 320 has no left neighbour on the tape; it stays 0
 .cell:
     mov al, [di-321]        ; left
     mov ah, [di-320]        ; centre

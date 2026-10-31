@@ -12,14 +12,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: install nasm, qemu, pillow
+      - name: install nasm, qemu, ffmpeg, numpy, pillow
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm qemu-system-x86
+          sudo apt-get install -y nasm qemu-system-x86 ffmpeg
           pip install -r requirements.txt
       - name: rebuild from source
         run: python3 build.py
       - name: the committed image is exactly what the source builds
         run: git diff --exit-code -- fixpoint.bmp stub.asm
-      - name: boot it and compare the screen to the image
+      - name: check every claim (decoders, disk, archive) and boot it
         run: python3 verify.py

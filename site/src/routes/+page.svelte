@@ -7,7 +7,7 @@
 
 	const repo = 'https://github.com/oddurs/fixpoint';
 	const site = 'https://oddurs.github.io/fixpoint';
-	const title = 'fixpoint — a 66 KB image that boots and computes itself';
+	const title = 'fixpoint — an 86 KB image that boots and computes itself';
 	const description =
 		'A 320×200 BMP that is also a boot sector. Boot it and the CPU recomputes the picture: Rule 110, seeded by its own machine code.';
 </script>

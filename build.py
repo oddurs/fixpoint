@@ -1,140 +1,298 @@
-"""build fixpoint.bmp — a 320x200 BMP whose pixels are a rule 110 universe seeded by
+"""build fixpoint.bmp: a 320x200 bmp whose pixels are a rule 110 universe seeded by
 the machine code that computes it. boot the file and it recomputes itself.
 
-  0      "BM"                 inc dx ; dec bp
-  2      EB 02 01 00          bfSize = 66,283, and `jmp short +2`
-  6      E9 xx xx             bfReserved: `jmp near` into the palette
-  10     1078                 pixel offset
-  54     palette              an indigo-to-peach ramp; seven entries are the stub
-  510    55 AA                inside palette entry 0x72, which becomes a highlight
-  1078   pixels               row 0 ends with the program; rows 1..199 are its universe
+  offset  as a bmp                     as x86 / as a disk
+  0       "BM"                         inc dx ; dec bp
+  2       file size, EB xx 01 00       jmp short into the palette
+  10      pixel offset = 1078
+  14      info header (top-down)       (bios may patch 11..61 as a floppy bpb; nothing lives there)
+  54      palette, 256 x BGRx          the stub, woven between colours
+  446     palette entries 98..113      the partition table: status bytes are a valid 0x80
+  510     palette entry 0x72           55 AA, the boot signature
+  1078    pixels                       row 0 ends with the program
+  65078   padding, then a zip          the source, so `unzip fixpoint.bmp` works
+
+usage: python3 build.py   (needs nasm and numpy). writes fixpoint.bmp and stub.asm.
 """
-import math, os, random, struct, subprocess
+import io, os, struct, subprocess, tempfile, zipfile
+from functools import lru_cache
 
-W, H, PIX = 320, 200, 1078
-SIZE = 0x000102EB
+import numpy as np
 
-def nasm(src, **defs):
-    args = ["nasm", "-f", "bin", src, "-o", "/dev/stdout"] + ["-D%s=%d" % kv for kv in defs.items()]
-    return subprocess.run(args, check=True, capture_output=True).stdout
+W, H = 320, 200
+PAL, PIX = 54, 1078                  # palette and pixel offsets
+LOAD = 0x8000                        # the stub loads the first sectors here
+MBR_STATUS = (446, 462, 478, 494)    # partition status bytes: must be 0x00 or 0x80
+BPB_END = 62                         # bios floppy emulation may rewrite bytes 11..61
+SIGNATURE = 510                      # 55 AA
+SOURCES = ("main.asm", "stub.asm", "build.py")
 
-# --- the program, placed so it ends exactly at the end of row 0
-n = len(nasm("main.asm", ORG=0x8000, X0=0))
-X0 = W - n
-MAIN_ORG = 0x8000 + PIX + X0
-MAIN = nasm("main.asm", ORG=MAIN_ORG, X0=X0)
-assert len(MAIN) == n
 
-# --- the universe: exactly what the loop in main.asm computes
-m = bytearray(W * H)
-m[X0:W] = MAIN
-cell = lambda i: m[i] if 0 <= i < W * H else 0
-for i in range(W, W * H):
-    l, c, r = cell(i - W - 1), cell(i - W), cell(i - W + 1)
-    m[i] = (c | r) & ~(l & c & r) & 0xFF
+# ------------------------------------------------------------------ assembling
 
-# --- the palette: an indigo-to-peach value ramp. entry 0x72 must hold B=55 G=AA
-#     (file offsets 510-511), so it becomes (255,170,85): branch orange, a highlight.
-stops = [(0x00, (4, 6, 14)), (0x5A, (28, 38, 92)), (0x9E, (120, 96, 170)),
-         (0xD9, (236, 170, 120)), (0xFF, (255, 246, 228))]
-def ramp(v):
-    for (a, ca), (b, cb) in zip(stops, stops[1:]):
-        if v <= b:
-            t = (v - a) / (b - a)
-            return tuple(round(ca[k] + (cb[k] - ca[k]) * t) for k in range(3))
-pal = [ramp(v) for v in range(256)]
-pal[0x72] = (0xFF, 0xAA, 0x55)
+def nasm(source, **defines):
+    with tempfile.TemporaryDirectory() as tmp:
+        src, out = os.path.join(tmp, "in.asm"), os.path.join(tmp, "out.bin")
+        with open(src, "w") as f:
+            f.write(source)
+        subprocess.run(["nasm", "-f", "bin", src, "-o", out]
+                       + ["-D%s=%d" % kv for kv in defines.items()], check=True)
+        return open(out, "rb").read()
 
-hist = [0] * 256
-for b in m: hist[b] += 1
 
-# --- the stub, arranged so its bytes are good colours.
-# independent instructions can be reordered, some have alternate encodings, and
-# harmless one-byte fillers can go anywhere. search for the layout whose bytes,
-# read as (B, G, R, x) palette entries, sit closest to the ramp they replace.
-FILL = {"nop": 0x90, "cld": 0xFC, "clc": 0xF8, "stc": 0xF9, "cmc": 0xF5,
-        "inc si": 0x46, "inc di": 0x47, "inc bp": 0x45, "dec si": 0x4E, "dec di": 0x4F}
-FREE = [["dec dx"],                                     # undo "B" = inc dx
-        ["mov bx, 0x8000"],
-        ["mov cx, 0x0001"], ["mov dh, 0"]]               # any order
-ES = [["xor ax, ax", "mov es, ax"], ["push byte 0", "pop es"]]
-AX = [["mov ax, 0x0203"], ["mov ah, 2", "mov al, 3"]]
-TAIL = ["int 0x13", "jmp 0x0000:%d" % MAIN_ORG]
-def enc(lines):
-    src = "bits 16\n" + "\n".join(lines) + "\n"
-    open("_stub_try.asm", "w").write(src)
-    out = nasm("_stub_try.asm")
-    os.remove("_stub_try.asm")
-    return out
-cache = {}
-def code(lines):
-    key = tuple(lines)
-    if key not in cache: cache[key] = enc(lines)
-    return cache[key]
-def score(stub, off):
-    p = {}
-    for j, b in enumerate(stub):
-        e, ch = divmod(off + j - 54, 4)
-        if e in (0, 0x72) or e < 0: return None
-        p.setdefault(e, list(pal[e]))
-        if ch < 3: p[e][2 - ch] = b
-    if off + len(stub) > 510: return None
-    return sum(hist[e] * math.dist(c, pal[e]) for e, c in p.items())
-rng = random.Random(110)
-best = None
-units = {}
-for _ in range(6000):
-    blocks = [list(b) for b in FREE]
-    blocks.insert(rng.randrange(len(blocks) + 1), [None])            # es/ax pair slot
-    seq = []
-    for b in blocks:
-        if b == [None]:
-            seq += rng.choice(ES) + rng.choice(AX)
+@lru_cache(maxsize=None)
+def encode(lines):
+    """bytes for a short run of 16-bit instructions (position-independent ones only)."""
+    return nasm("bits 16\n" + lines + "\n")
+
+
+def build_main():
+    """assemble main.asm so it ends exactly at the end of row 0."""
+    src = open("main.asm").read()
+    n = len(nasm(src, ORG=LOAD, X0=0))
+    x0 = W - n
+    org = LOAD + PIX + x0
+    code = nasm(src, ORG=org, X0=x0)
+    assert len(code) == n
+    return code, x0, org
+
+
+# ------------------------------------------------------------------ the picture
+
+def universe(program, x0):
+    """exactly what the loop in main.asm computes."""
+    m = bytearray(W * H)
+    m[x0:W] = program
+    for i in range(W + 1, W * H):
+        l, c, r = m[i - W - 1], m[i - W], m[i - W + 1]
+        m[i] = (c | r) & ~(l & c & r) & 0xFF
+    return m
+
+
+def palette():
+    """an indigo-to-peach value ramp, bent where the boot sector needs it."""
+    stops = [(0x00, (4, 6, 14)), (0x5A, (28, 38, 92)), (0x9E, (120, 96, 170)),
+             (0xD9, (236, 170, 120)), (0xFF, (255, 246, 228))]
+
+    def ramp(v):
+        for (a, ca), (b, cb) in zip(stops, stops[1:]):
+            if v <= b:
+                t = (v - a) / (b - a)
+                return [round(ca[k] + (cb[k] - ca[k]) * t) for k in range(3)]
+
+    pal = [ramp(v) for v in range(256)]
+    # the boot signature is the blue and green of entry 0x72: it becomes an orange highlight
+    pal[0x72] = [0xFF, 0xAA, 0x55]
+    # partition status bytes are blue channels; snap each to the nearer legal value
+    for off in MBR_STATUS:
+        e = (off - PAL) // 4
+        pal[e][2] = 0x80 if pal[e][2] >= 0x40 else 0x00
+    return pal
+
+
+# ------------------------------------------------------------------ the stub
+#
+# the stub's bytes are palette colours, so where they go matters. it is a list of
+# units (instructions, or a block that must stay contiguous). between units we may
+# put a harmless one-byte filler, or `jmp short` over palette bytes we'd rather
+# leave alone. a dynamic program over (units placed, position) finds the layout
+# whose bytes, read as colours, disturb the picture least: the cost of a byte is
+# its squared distance from the colour channel it replaces, weighted by how many
+# pixels use that colour. the bios jumps in from offset 2, so the stub starts
+# within reach of a short jump, and after the bpb.
+
+FILLERS = ["nop", "cld", "clc", "stc", "cmc", "inc si", "inc di", "inc bp", "dec si", "dec di"]
+
+
+def stub_units(main_org):
+    es = [("push byte 0", "pop es"), ("xor ax, ax", "mov es, ax")]
+    read = ["read: mov ax, 0x0203\nint 0x13\njc read",           # retry until the read works
+            "read: mov ah, 2\nmov al, 3\nint 0x13\njc read"]
+    free = ["dec dx",                                            # "B" was inc dx: restore the drive
+            "mov bx, 0x%04X" % LOAD, "mov cx, 0x0001", "mov dh, 0"]
+    jump = "jmp 0x0000:0x%04X" % main_org
+    for e in es:
+        for r in read:
+            # units in `free` + e may go in any order (e[0] before e[1]); then read, then jump
+            yield list(free) + list(e), (r, jump)
+
+
+def place_stub(pal, hist, main_org):
+    N = SIGNATURE + 1
+    allowed = np.array([BPB_END <= o < SIGNATURE and o not in MBR_STATUS for o in range(N)])
+    C = np.zeros((N, 256))                   # C[off, b]: cost of byte b at file offset off
+    for off in range(PAL, N):
+        e, ch = divmod(off - PAL, 4)
+        if ch < 3:
+            C[off] = hist[e] * (np.arange(256) - pal[e][2 - ch]) ** 2
+    C[~allowed] = np.inf
+
+    fill = {f: encode(f)[0] for f in FILLERS}
+    fnames = list(fill)
+    fcost = np.stack([C[:, fill[f]] for f in fnames])   # (fillers, N)
+    fbest, fpick = fcost.min(0), fcost.argmin(0)
+    D = np.arange(1, 128)
+    hop = np.full((N, 127), np.inf)                     # hop[p, d-1]: cost of `jmp short d` at p
+    for p in range(N - 1):
+        hop[p] = C[p, 0xEB] + C[p + 1, D]
+
+    best = None
+    for movable, tail in stub_units(main_org):
+        units = movable + list(tail)
+        enc = [encode(u) for u in units]
+        k, T = len(movable), len(tail)
+        full = (1 << k) - 1
+        must = {k - 1: k - 2}                           # pop es / mov es after its partner
+        ucost = np.full((len(units), N), np.inf)        # ucost[i, p]: unit i placed at p
+        for i, code in enumerate(enc):
+            for p in range(N - len(code)):
+                ucost[i, p] = sum(C[p + j, b] for j, b in enumerate(code))
+
+        K = (1 << k) * (T + 1)
+        key = lambda mask, t: mask * (T + 1) + t
+        dp = np.full((K, N), np.inf)
+        back = {}                                       # (key, p) -> (prev key, prev p, move)
+        for s in range(BPB_END, min(PAL + 4 * 32, N)):  # within `jmp short` reach of offset 2
+            if s - 4 <= 127 and allowed[s]:
+                dp[key(0, 0), s] = 0
+                back[key(0, 0), s] = (None, None, ("start", s))
+
+        for p in range(BPB_END, N):
+            for kk in np.nonzero(np.isfinite(dp[:, p]))[0]:
+                c = dp[kk, p]
+                mask, t = divmod(int(kk), T + 1)
+                if t == T:
+                    continue
+                if p + 1 < N and c + fbest[p] < dp[kk, p + 1]:
+                    dp[kk, p + 1] = c + fbest[p]
+                    back[kk, p + 1] = (kk, p, ("fill", fnames[fpick[p]]))
+                q1, q2 = p + 3, min(p + 130, N)
+                if q1 < q2:
+                    cand = c + hop[p, :q2 - q1]
+                    better = np.nonzero(cand < dp[kk, q1:q2])[0]
+                    for j in better:
+                        dp[kk, q1 + j] = cand[j]
+                        back[kk, q1 + j] = (kk, p, ("hop", int(j) + 1))
+                nxt = ([i for i in range(k) if not mask >> i & 1 and (i not in must or mask >> must[i] & 1)]
+                       if mask != full else [k + t])
+                for i in nxt:
+                    q = p + len(enc[i])
+                    if q >= N or not np.isfinite(ucost[i, p]):
+                        continue
+                    k2 = key(mask | 1 << i, t) if i < k else key(mask, t + 1)
+                    if c + ucost[i, p] < dp[k2, q]:
+                        dp[k2, q] = c + ucost[i, p]
+                        back[k2, q] = (kk, p, ("unit", i))
+        end_key = key(full, T)
+        q = int(np.argmin(dp[end_key]))
+        if np.isfinite(dp[end_key, q]) and (best is None or dp[end_key, q] < best[0]):
+            best = (float(dp[end_key, q]), (end_key, q), back, units, enc)
+
+    c, st, back, units, enc = best
+    moves = []
+    while True:
+        pk, pp, move = back[st]
+        if pk is None:
+            start = move[1]
+            break
+        moves.append(move)
+        st = (pk, pp)
+    return c, start, list(reversed(moves)), units, enc, fill
+
+
+def lay_out(pal, start, moves, units, enc, fill):
+    """the stub's bytes, the palette bytes it hops over, and stub.asm."""
+    image = bytearray(4 * 256)
+    for i, (r, g, b) in enumerate(pal):
+        image[4 * i:4 * i + 4] = bytes((b, g, r, 0))
+
+    out, asm, p, label = {}, [], start, 0
+    for kind, arg in moves:
+        if kind == "fill":
+            out[p] = fill[arg]
+            asm.append("    %-24s; filler, for its colour" % arg)
+            p += 1
+        elif kind == "hop":
+            label += 1
+            out[p], out[p + 1] = 0xEB, arg
+            skipped = image[p + 2 - PAL:p + 2 + arg - PAL]
+            asm.append("    %-24s; hop over %d palette bytes" % ("jmp short .h%d" % label, arg))
+            asm.append("    db " + ", ".join("0x%02X" % b for b in skipped))
+            asm.append(".h%d:" % label)
+            p += 2 + arg
         else:
-            seq += b
-    seq += TAIL
-    out = []
-    for ins in seq:
-        while rng.random() < 0.35:
-            out.append(rng.choice(list(FILL)))
-        out.append(ins)
-    stub = code(out)
-    for off in range(58, 510 - len(stub)):
-        sc = score(stub, off)
-        if sc is not None and (best is None or sc < best[0]):
-            best = (sc, off, out, stub)
-cost, stub_off, STUB_SRC, STUB = best
-STUB_LEN = len(STUB)
-k = (stub_off - 54) // 4
-k_entries = (stub_off + STUB_LEN - 1 - 54) // 4 - k + 1
-with open("stub.asm", "w") as fh:
-    fh.write("; stub.asm — generated by build.py. loads the first three sectors to 0000:8000 and\n"
-             "; jumps into the pixels. it lives in BMP palette entries %d..%d, so its bytes are\n"
-             "; colours: instruction order and the fillers marked ; colour were chosen by search\n"
-             "; so those colours sit close to the ramp they replace.\nbits 16\norg 0x%X\n\n"
-             % (k, k + k_entries - 1, 0x7C00 + stub_off))
-    for ins in STUB_SRC:
-        fh.write("    %-22s%s\n" % (ins, "; colour" if ins in FILL else ""))
-assert nasm("stub.asm") == STUB
-for j, b in enumerate(STUB):                    # what the stub does to the palette
-    e, ch = divmod(stub_off + j - 54, 4)
-    if ch < 3:
-        c = list(pal[e]); c[2 - ch] = b; pal[e] = tuple(c)
+            code = enc[arg]
+            for j, b in enumerate(code):
+                out[p + j] = b
+            for line in units[arg].split("\n"):
+                asm.append(("%s" if line.endswith(":") or line.startswith("read:") else "    %s")
+                           % line.replace("read: ", "read:\n    "))
+            p += len(code)
+    end = p
+    header = ("; stub.asm, generated by build.py: the bootloader, woven into the bmp palette.\n"
+              "; the bios jumps here from offset 2. it reads the first three sectors to 0000:%04X\n"
+              "; and jumps into the pixels. its bytes are palette colours, so its layout (order,\n"
+              "; encodings, fillers, hops) was chosen to disturb the picture least.\n"
+              "bits 16\norg 0x%04X\n\n" % (LOAD, 0x7C00 + start))
+    return out, end, header + "\n".join(asm) + "\n"
 
-# --- assemble the file
-f = bytearray(SIZE)
-f[0:14] = b"BM" + struct.pack("<IHHI", SIZE, 0, 0, PIX)
-f[6:9] = b"\xE9" + struct.pack("<h", stub_off - 9)
-f[14:54] = struct.pack("<IiiHHIIiiII", 40, W, -H, 1, 8, 0, W * H, 2835, 2835, 256, 0)
-for i, (r, g, b) in enumerate(pal):
-    f[54 + 4 * i: 58 + 4 * i] = bytes((b, g, r, 0))
-f[stub_off:stub_off + STUB_LEN] = STUB
-f[PIX:PIX + W * H] = m
-assert f[2:4] == b"\xEB\x02" and f[510:512] == b"\x55\xAA"
-assert PIX + W <= 3 * 512                 # the program is inside the three sectors loaded
-open("fixpoint.bmp", "wb").write(f)
 
-forced = sum(hist[k:k + k_entries])
-print(f"colour clash {cost:.0f} (weighted RGB distance)")
-print(f"main {len(MAIN)} B at row 0 x={X0}..319 | stub {STUB_LEN} B in palette entries "
-      f"{k}..{k + k_entries - 1} (colours {forced} px, {forced / 640:.2f}% of the image)")
+# ------------------------------------------------------------------ the file
+
+def source_zip(prefix_len):
+    buf = io.BytesIO()
+    buf.write(b"\0" * prefix_len)
+    with zipfile.ZipFile(buf, "a", zipfile.ZIP_STORED) as z:
+        for name in SOURCES:
+            info = zipfile.ZipInfo("fixpoint/" + name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr = 0o644 << 16
+            z.writestr(info, open(name, "rb").read())
+    return buf.getvalue()[prefix_len:]
+
+
+def main():
+    program, x0, main_org = build_main()
+    m = universe(program, x0)
+    hist = [0] * 256
+    for b in m:
+        hist[b] += 1
+
+    pal = palette()
+    clash, start, moves, units, enc, fill = place_stub(pal, hist, main_org)
+    stub, stub_end, stub_asm = lay_out(pal, start, moves, units, enc, fill)
+    open("stub.asm", "w").write(stub_asm)
+
+    size = 0x10000 + ((start - 4) << 8) + 0xEB          # bytes EB, start-4, 01, 00
+    f = bytearray(size)
+    f[0:14] = b"BM" + struct.pack("<IHHI", size, 0, 0, PIX)
+    f[14:PAL] = struct.pack("<IiiHHIIiiII", 40, W, -H, 1, 8, 0, W * H, 2835, 2835, 256, 0)
+    for i, (r, g, b) in enumerate(pal):
+        f[PAL + 4 * i:PAL + 4 * i + 4] = bytes((b, g, r, 0))
+    for off, b in stub.items():
+        f[off] = b
+    f[PIX:PIX + W * H] = m
+
+    zipped = source_zip(0)
+    assert PIX + W * H + len(zipped) <= size, "source zip doesn't fit in the padding"
+    f[size - len(zipped):] = source_zip(size - len(zipped))
+
+    # the claims, checked
+    assert f[2] == 0xEB and 4 + f[3] == start
+    assert f[6:10] == bytes(4)                                   # reserved fields are zero
+    assert f[SIGNATURE:SIGNATURE + 2] == b"\x55\xAA"
+    assert all(f[o] in (0x00, 0x80) for o in MBR_STATUS)
+    assert all(off >= BPB_END for off in stub)
+    assert nasm(stub_asm) == bytes(f[start:stub_end])           # stub.asm is the truth
+    assert PIX + W <= 3 * 512                                    # the program is in what's loaded
+    open("fixpoint.bmp", "wb").write(f)
+
+    changed = [e for e in range(256)
+               if tuple(f[PAL + 4 * e:PAL + 4 * e + 3]) != tuple(reversed(pal[e]))]
+    px = sum(hist[e] for e in changed)
+    print(f"fixpoint.bmp: {size} bytes | program {len(program)} B, row 0 x={x0}..319 | "
+          f"stub {len(stub)} B between offsets {start} and {stub_end - 1}, shifting "
+          f"{len(changed)} colours ({px} px, {px / 640:.2f}% of the image)")
+
+
+if __name__ == "__main__":
+    main()
