@@ -1,2 +1,6 @@
 numpy>=1.24
 pillow>=10
+# figure 1 is set in the computer modern that matplotlib ships, drawn by fonttools;
+# pinned so ci can regenerate docs/anatomy.svg byte for byte
+matplotlib==3.11.2
+fonttools==4.67.0

@@ -57,7 +57,7 @@ rule 110 being turing-complete is a property of the rule, not a claim about this
 
 ## how one file is a picture, a disk, and an archive
 
-![the boot sector, drawn as the palette it lives in, with the cpu's path through it](docs/anatomy.svg)
+![figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, with the path the cpu takes through them](docs/anatomy.svg)
 
 | offset | as a bmp | as a disk |
 |---|---|---|
@@ -74,7 +74,7 @@ ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, a
 
 - **the file size is a jump instruction.** its low byte is `EB`, `jmp short`, and the next byte is the distance into the palette. the file is padded until the size it claims is true, and the padding holds a zip of `main.asm`, `stub.asm`, and `build.py`, so the file carries its own source.
 - **the boot sector is palette colours.** the signature `55 AA` is the blue and green of entry `0x72`, and the four partition status bytes are blue channels, set to `80` so the partition table is legal and bioses accept the disk. all five entries have bit 6 set, so they're already warm colours: the boot sector moves them by at most 30 levels in any channel. the two bytes every bios looks for first are one of the oranges in the cone. they appear 107 times in the picture, if you know where to look.
-- **the bootloader is woven into the palette.** its 36 bytes would otherwise be 36 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in the figure above, they're the swatches the thread runs through. [`stub.asm`](stub.asm) writes out every palette entry it hops over, with its colour.
+- **the bootloader is woven into the palette.** its 36 bytes would otherwise be 36 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in figure 1 above, they're the swatches the traced path runs through. [`stub.asm`](stub.asm) writes out every palette entry it hops over, with its colour.
 - **it doesn't care where it starts.** until its final far jump, the bootloader uses only relative jumps, so it runs the same whether the bios starts it at `0000:7C00` or `07C0:0000`.
 - **it stays clear of the bpb.** a bios booting a usb stick as a floppy may rewrite bytes 11–61 in memory. nothing executable lives there, and the program reads the palette from a fresh copy off the disk.
 - **it retries.** a failed disk read loops back to the read, instead of jumping into whatever happened to be in memory.
@@ -82,7 +82,7 @@ ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, a
 
 ## build
 
-needs `nasm`, python 3, and numpy. verifying also needs pillow and `qemu-system-i386`, and uses ffmpeg and chrome when they're installed.
+needs `nasm`, python 3, and the packages in `requirements.txt`. verifying also needs `qemu-system-i386`, and uses ffmpeg and chrome when they're installed.
 
 ```
 make            # assemble main.asm, place the stub, write fixpoint.bmp, stub.asm, and the figures
