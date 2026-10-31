@@ -1,11 +1,12 @@
 """check every claim fixpoint.bmp makes, then boot it.
 
-  - it is a valid bmp: pillow, ffmpeg and chrome all decode it to the same pixels
-  - it is a valid boot sector: 55 AA, legal partition status bytes, zero reserved fields
-  - it carries its source: the zip in its padding matches the files in this repo
-  - it is a rule 110 universe: every row follows from the one above it
-  - its dark cells are exactly the cells the program has not reached
-  - it is a fixed point: booted in qemu, the screen equals the image, pixel for pixel
+  as a bmp      pillow, ffmpeg and chrome all decode it to the same pixels
+  as a disk     55 AA, legal partition status bytes, a jump into the palette
+  as a picture  every row follows from the one above by rule 110, and every
+                cell the program hasn't reached is dark
+  as an archive the zip in its padding is the source in this repo
+  as a program  booted in qemu, video memory holds exactly its 64,000 pixel
+                bytes, and the screen shows exactly its colours
 
 needs numpy, pillow and qemu-system-i386. ffmpeg and chrome are checked when installed.
 usage: python3 verify.py [fixpoint.bmp]
@@ -30,7 +31,8 @@ def skip(name, why):
 
 
 def boot(path, timeout=30):
-    """boot in qemu; return the screen once it has been in mode 13h and stopped changing."""
+    """boot in qemu. once the screen is in mode 13h and has stopped changing, return
+    it and the 64,000 bytes of video memory at A000:0000, or (None, None)."""
     tmp = tempfile.mkdtemp()
     sock = os.path.join(tmp, "mon.sock")
     qemu = subprocess.Popen(["qemu-system-i386", "-drive", f"format=raw,file={path},if=ide",
@@ -44,28 +46,33 @@ def boot(path, timeout=30):
                 break
             except OSError:
                 time.sleep(0.05)
-        s.settimeout(5)
-        s.recv(4096)
+        s.settimeout(10)
+
+        def monitor(cmd=None):                            # send a command, wait for the prompt
+            if cmd:
+                s.send(cmd.encode() + b"\n")
+            buf = b""
+            while not buf.rstrip().endswith(b"(qemu)"):
+                buf += s.recv(65536)
+
+        monitor()
         prev, n, deadline = None, 0, time.time() + timeout
         while time.time() < deadline:
             shot = os.path.join(tmp, f"{n}.ppm")
             n += 1
-            s.send(f"screendump {shot}\n".encode())
-            s.recv(4096)                                  # the monitor echoes when it's done
-            time.sleep(0.05)
-            try:
-                im = Image.open(shot)
-                im.load()
-            except OSError:
-                continue
+            monitor(f'screendump "{shot}"')
+            im = Image.open(shot)
             if im.size != (2 * W, 2 * H):                 # still in the bios text mode
+                time.sleep(0.1)
                 continue
             frame = im.convert("RGB").resize((W, H), Image.NEAREST)
             if prev is not None and frame.tobytes() == prev.tobytes():
-                return frame
+                vram = os.path.join(tmp, "vram.bin")
+                monitor(f'pmemsave 0xA0000 {W * H} "{vram}"')
+                return frame, open(vram, "rb").read()
             prev = frame
             time.sleep(0.25)
-        return None
+        return None, None
     finally:
         qemu.kill()
         qemu.wait()
@@ -131,8 +138,8 @@ def main():
     status = [data[o] for o in (446, 462, 478, 494)]
     check("partition status bytes are legal", all(s in (0, 0x80) for s in status),
           " ".join("%02X" % s for s in status))
-    check("first instruction jumps into the palette", data[2] == 0xEB and 62 <= 4 + data[3] < 1078,
-          f"jmp short to offset {4 + data[3]}")
+    check("offset 2, the file size, jumps into the palette", data[2] == 0xEB and 62 <= 4 + data[3] < 1078,
+          f"EB {data[3]:02X}: jmp short to offset {4 + data[3]}")
 
     print("as a picture")
     pixels = np.frombuffer(ref.tobytes(), np.uint8)
@@ -161,17 +168,18 @@ def main():
         check("carries its source as a zip", False)
 
     print("as a program")
-    screen = boot(path)
+    screen, vram = boot(path)
     if screen is None:
         check("boots into mode 13h", False)
     else:
-        pal = ref.getpalette()
-        idx, px = ref.tobytes(), screen.load()
-        # the vga dac keeps 6 bits per channel, so allow for the 2 it drops
-        bad = sum(1 for i in range(W * H)
-                  if max(abs(a - b) for a, b in zip(pal[3 * idx[i]:3 * idx[i] + 3],
-                                                    px[i % W, i // W])) > 3)
-        check("booted screen equals the image", bad == 0, f"{W * H - bad}/{W * H} pixels")
+        same = sum(a == b for a, b in zip(vram, ref.tobytes()))
+        check("video memory holds exactly the pixel bytes", same == W * H, f"{same}/{W * H} bytes")
+        # the vga dac has 6 bits per channel, so compare colours at the dac's precision
+        want = np.array(ref.convert("RGB")) >> 2
+        got = np.array(screen) >> 2
+        same = int((want == got).all(axis=2).sum())
+        check("the screen shows exactly the image's colours", same == W * H,
+              f"{same}/{W * H} pixels, at the dac's 6 bits per channel")
 
     print("all claims hold" if all(results) else "SOME CLAIMS FAIL")
     sys.exit(0 if all(results) else 1)

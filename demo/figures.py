@@ -1,16 +1,19 @@
-"""draw anatomy.svg: the boot sector as the palette it lives in, with the path the
+"""draw the readme's figures from fixpoint.bmp itself.
+
+docs/preview.png: the image, scaled 3x with no smoothing.
+docs/anatomy.svg: the boot sector as the palette it lives in, with the path the
 cpu takes through it.
 
 the path is not taken from build.py. it is traced from fixpoint.bmp itself: start
 at byte 0, disassemble one instruction at a time with ndisasm, follow every
 `jmp short`, stop at the far jump into the pixels.
 
-usage: python3 demo/anatomy.py   (from the repo root; needs nasm's ndisasm and pillow)
+usage: python3 demo/figures.py   (from the repo root; needs nasm's ndisasm and pillow)
 """
 import re, subprocess
 from PIL import Image
 
-BMP, OUT = "fixpoint.bmp", "anatomy.svg"
+BMP, OUT, PREVIEW = "fixpoint.bmp", "docs/anatomy.svg", "docs/preview.png"
 PAL, SECTOR = 54, 512
 data = open(BMP, "rb").read()
 palette = Image.open(BMP).getpalette()
@@ -149,6 +152,8 @@ def main():
                  f'<text x="{X0 + 16}" y="{y + i * 20}" fill="{muted}" font-size="11.5">{text}</text>')
     o.append("</svg>")
     open(OUT, "w").write("\n".join(o) + "\n")
+    image = Image.open(BMP).convert("RGB")
+    image.resize((3 * image.width, 3 * image.height), Image.NEAREST).save(PREVIEW)
     print(f"{OUT}: {len(path)} instructions traced, {code} bytes of code in the palette, {jumps} hops")
 
 

@@ -49,10 +49,10 @@ def encode(lines):
 def build_main():
     """assemble main.asm so it ends exactly at the end of row 0."""
     src = open("main.asm").read()
-    n = len(nasm(src, ORG=LOAD, X0=0))
+    n = len(nasm(src, ORG=LOAD, X0=0, LOAD=LOAD))
     x0 = W - n
     org = LOAD + PIX + x0
-    code = nasm(src, ORG=org, X0=x0)
+    code = nasm(src, ORG=org, X0=x0, LOAD=LOAD)
     assert len(code) == n
     return code, x0, org
 
@@ -124,16 +124,19 @@ FILLERS = ["nop", "cld", "clc", "stc", "cmc", "inc si", "inc di", "inc bp", "dec
 
 
 def stub_units(main_org):
+    """(movable units, units that must follow them in order, ordering constraints)."""
     es = [("push byte 0", "pop es"), ("xor ax, ax", "mov es, ax")]
     read = ["read: mov ax, 0x0203\nint 0x13\njc read",           # retry until the read works
             "read: mov ah, 2\nmov al, 3\nint 0x13\njc read"]
-    free = ["dec dx",                                            # "B" was inc dx: restore the drive
-            "mov bx, 0x%04X" % LOAD, "mov cx, 0x0001", "mov dh, 0"]
+    free = ["dec dx",                    # "B" was inc dx: put the boot drive back in dl
+            "mov dh, 0",                 # head 0, after dec dx, so a carry out of dl can't linger
+            "mov bx, 0x%04X" % LOAD,     # es:bx = where the sectors go
+            "mov cx, 0x0001"]            # cylinder 0, sector 1
     jump = "jmp 0x0000:0x%04X" % main_org
+    after = {1: 0, 5: 4}                 # unit -> the unit it must follow
     for e in es:
         for r in read:
-            # units in `free` + e may go in any order (e[0] before e[1]); then read, then jump
-            yield list(free) + list(e), (r, jump)
+            yield list(free) + list(e), (r, jump), after
 
 
 def place_stub(pal, hist, main_org):
@@ -156,12 +159,11 @@ def place_stub(pal, hist, main_org):
         hop[p] = C[p, 0xEB] + C[p + 1, D]
 
     best = None
-    for movable, tail in stub_units(main_org):
+    for movable, tail, must in stub_units(main_org):
         units = movable + list(tail)
         enc = [encode(u) for u in units]
         k, T = len(movable), len(tail)
         full = (1 << k) - 1
-        must = {k - 1: k - 2}                           # pop es / mov es after its partner
         ucost = np.full((len(units), N), np.inf)        # ucost[i, p]: unit i placed at p
         for i, code in enumerate(enc):
             for p in range(N - len(code)):
@@ -219,7 +221,27 @@ def place_stub(pal, hist, main_org):
     return c, start, list(reversed(moves)), units, enc, fill
 
 
-def lay_out(pal, start, moves, units, enc, fill):
+CHANNELS = ("blue", "green", "red", "unused")
+
+
+def palette_lines(image, first, last):
+    """db lines for file bytes first..last-1 of the palette, one entry per line."""
+    lines, off = [], first
+    while off < last:
+        e, ch = divmod(off - PAL, 4)
+        end = min(last, PAL + 4 * (e + 1))
+        chunk = image[off - PAL:end - PAL]
+        if ch == 0 and end - off == 4:
+            b, g, r, _ = chunk
+            note = "entry %02X  #%02x%02x%02x" % (e, r, g, b)
+        else:
+            note = "entry %02X  %s" % (e, ", ".join(CHANNELS[ch:ch + len(chunk)]))
+        lines.append("    %-28s; %s" % ("db " + ", ".join("0x%02X" % b for b in chunk), note))
+        off = end
+    return lines
+
+
+def lay_out(pal, start, moves, units, enc, fill, x0):
     """the stub's bytes, the palette bytes it hops over, and stub.asm."""
     image = bytearray(4 * 256)
     for i, (r, g, b) in enumerate(pal):
@@ -229,14 +251,14 @@ def lay_out(pal, start, moves, units, enc, fill):
     for kind, arg in moves:
         if kind == "fill":
             out[p] = fill[arg]
-            asm.append("    %-24s; filler, for its colour" % arg)
+            asm.append("    %-28s; filler, for its colour" % arg)
             p += 1
         elif kind == "hop":
             label += 1
             out[p], out[p + 1] = 0xEB, arg
             skipped = image[p + 2 - PAL:p + 2 + arg - PAL]
-            asm.append("    %-24s; hop over %d palette bytes" % ("jmp short .h%d" % label, arg))
-            asm.append("    db " + ", ".join("0x%02X" % b for b in skipped))
+            asm.append("    %-28s; hop over %d bytes of palette" % ("jmp short .h%d" % label, arg))
+            asm.extend(palette_lines(image, p + 2, p + 2 + arg))
             asm.append(".h%d:" % label)
             p += 2 + arg
         else:
@@ -244,14 +266,23 @@ def lay_out(pal, start, moves, units, enc, fill):
             for j, b in enumerate(code):
                 out[p + j] = b
             for line in units[arg].split("\n"):
-                asm.append(("%s" if line.endswith(":") or line.startswith("read:") else "    %s")
-                           % line.replace("read: ", "read:\n    "))
+                if line.startswith("read: "):
+                    asm.append("read:")
+                    line = line[len("read: "):]
+                if line.startswith("jmp 0x0000:"):
+                    line = "%-28s; into the pixels: row 0, x = %d" % (line, x0)
+                asm.append("    " + line)
             p += len(code)
     end = p
     header = ("; stub.asm, generated by build.py: the bootloader, woven into the bmp palette.\n"
+              ";\n"
               "; the bios jumps here from offset 2. it reads the first three sectors to 0000:%04X\n"
               "; and jumps into the pixels. its bytes are palette colours, so its layout (order,\n"
-              "; encodings, fillers, hops) was chosen to disturb the picture least.\n"
+              "; encodings, fillers, hops) was chosen to disturb the picture least. the palette\n"
+              "; bytes it hops over are written out below, one entry per line, with their colour.\n"
+              ";\n"
+              "; until the far jump it uses no absolute addresses, so it doesn't mind whether the\n"
+              "; bios starts it at 0000:7C00 or 07C0:0000.\n"
               "bits 16\norg 0x%04X\n\n" % (LOAD, 0x7C00 + start))
     return out, end, header + "\n".join(asm) + "\n"
 
@@ -276,7 +307,7 @@ def main():
 
     pal = palette()
     clash, start, moves, units, enc, fill = place_stub(pal, hist, main_org)
-    stub, stub_end, stub_asm = lay_out(pal, start, moves, units, enc, fill)
+    stub, stub_end, stub_asm = lay_out(pal, start, moves, units, enc, fill, x0)
     open("stub.asm", "w").write(stub_asm)
 
     size = 0x10000 + ((start - 4) << 8) + 0xEB          # bytes EB, start-4, 01, 00

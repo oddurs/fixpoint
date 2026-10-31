@@ -143,12 +143,13 @@
 <rect x="637.0" y="457.0" width="11.5" height="32" rx="2" fill="none" stroke="#ffd08a" stroke-width="1.5"/>
 <rect x="869.0" y="457.0" width="11.5" height="32" rx="2" fill="none" stroke="#ffd08a" stroke-width="1.5"/>
 <rect x="173.0" y="495.0" width="25.0" height="32" rx="2" fill="none" stroke="#f0f6fc" stroke-width="1.5"/>
-<path d="M64.6,146.0 L81.7,146.0 L98.8,146.0 L115.9,146.0 C300.3,146.0 458.3,245.0 642.8,245.0 L656.2,245.0 L669.8,245.0 L683.2,245.0 L700.8,245.0 L714.2,245.0 L727.8,245.0 L741.2,245.0 L758.8,245.0 L772.2,245.0 L785.8,245.0 L799.2,245.0 L816.8,245.0 C958.9,245.0 268.6,321.0 410.8,321.0 L424.2,321.0 L437.8,321.0 L451.2,321.0 L468.8,321.0 L482.2,321.0 L495.8,321.0 L509.2,321.0 L526.8,321.0 L540.2,321.0 L553.8,321.0 L567.2,321.0 L584.8,321.0 L598.2,321.0 L611.8,321.0 L625.2,321.0 L642.8,321.0 C682.8,321.0 701.2,359.0 741.2,359.0 L758.8,359.0 L772.2,359.0 L785.8,359.0 L799.2,359.0" fill="none" stroke="#0d1117" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-<path d="M64.6,146.0 L81.7,146.0 L98.8,146.0 L115.9,146.0 C300.3,146.0 458.3,245.0 642.8,245.0 L656.2,245.0 L669.8,245.0 L683.2,245.0 L700.8,245.0 L714.2,245.0 L727.8,245.0 L741.2,245.0 L758.8,245.0 L772.2,245.0 L785.8,245.0 L799.2,245.0 L816.8,245.0 C958.9,245.0 268.6,321.0 410.8,321.0 L424.2,321.0 L437.8,321.0 L451.2,321.0 L468.8,321.0 L482.2,321.0 L495.8,321.0 L509.2,321.0 L526.8,321.0 L540.2,321.0 L553.8,321.0 L567.2,321.0 L584.8,321.0 L598.2,321.0 L611.8,321.0 L625.2,321.0 L642.8,321.0 C682.8,321.0 701.2,359.0 741.2,359.0 L758.8,359.0 L772.2,359.0 L785.8,359.0 L799.2,359.0" fill="none" stroke="#f0f6fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M64.6,146.0 L81.7,146.0 L98.8,146.0 L115.9,146.0 C294.2,146.0 447.0,245.0 625.2,245.0 L642.8,245.0 L656.2,245.0 L669.8,245.0 L683.2,245.0 L700.8,245.0 L714.2,245.0 L727.8,245.0 L741.2,245.0 L758.8,245.0 L772.2,245.0 L785.8,245.0 L799.2,245.0 L816.8,245.0 C958.9,245.0 268.6,321.0 410.8,321.0 L424.2,321.0 L437.8,321.0 L451.2,321.0 L468.8,321.0 L482.2,321.0 L495.8,321.0 L509.2,321.0 L526.8,321.0 L540.2,321.0 L553.8,321.0 L567.2,321.0 L584.8,321.0 L598.2,321.0 L611.8,321.0 L625.2,321.0 L642.8,321.0 C682.8,321.0 701.2,359.0 741.2,359.0 L758.8,359.0 L772.2,359.0 L785.8,359.0 L799.2,359.0" fill="none" stroke="#0d1117" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+<path d="M64.6,146.0 L81.7,146.0 L98.8,146.0 L115.9,146.0 C294.2,146.0 447.0,245.0 625.2,245.0 L642.8,245.0 L656.2,245.0 L669.8,245.0 L683.2,245.0 L700.8,245.0 L714.2,245.0 L727.8,245.0 L741.2,245.0 L758.8,245.0 L772.2,245.0 L785.8,245.0 L799.2,245.0 L816.8,245.0 C958.9,245.0 268.6,321.0 410.8,321.0 L424.2,321.0 L437.8,321.0 L451.2,321.0 L468.8,321.0 L482.2,321.0 L495.8,321.0 L509.2,321.0 L526.8,321.0 L540.2,321.0 L553.8,321.0 L567.2,321.0 L584.8,321.0 L598.2,321.0 L611.8,321.0 L625.2,321.0 L642.8,321.0 C682.8,321.0 701.2,359.0 741.2,359.0 L758.8,359.0 L772.2,359.0 L785.8,359.0 L799.2,359.0" fill="none" stroke="#f0f6fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
 <circle cx="64.6" cy="146.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="81.7" cy="146.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="98.8" cy="146.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="115.9" cy="146.0" r="2.6" fill="#f0f6fc"/>
+<circle cx="625.2" cy="245.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="642.8" cy="245.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="656.2" cy="245.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="669.8" cy="245.0" r="2.6" fill="#f0f6fc"/>
@@ -185,7 +186,7 @@
 <circle cx="785.8" cy="359.0" r="2.6" fill="#f0f6fc"/>
 <circle cx="799.2" cy="359.0" r="2.6" fill="#f0f6fc"/>
 <path d="M799.2,359.0 l14,0" stroke="#f0f6fc" stroke-width="1.6"/><path d="M813.2,355.0 l6,4 l-6,4" fill="none" stroke="#f0f6fc" stroke-width="1.6"/>
-<circle cx="60" cy="554" r="3.5" fill="#f0f6fc"/><text x="72" y="558" fill="#8b949e" font-size="11.5">thread: 22 instructions, 35 bytes in the palette, 2 hops over colours it leaves alone</text>
+<circle cx="60" cy="554" r="3.5" fill="#f0f6fc"/><text x="72" y="558" fill="#8b949e" font-size="11.5">thread: 23 instructions, 36 bytes in the palette, 2 hops over colours it leaves alone</text>
 <circle cx="60" cy="574" r="3.5" fill="#ffd08a"/><text x="72" y="578" fill="#8b949e" font-size="11.5">gold: the four partition status bytes, blue channels set to 80 so bioses accept the disk</text>
 <circle cx="60" cy="594" r="3.5" fill="#f0f6fc"/><text x="72" y="598" fill="#8b949e" font-size="11.5">white: 55 AA, the boot signature, which is the blue and green of palette entry 0x72</text>
 </svg>

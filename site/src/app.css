@@ -103,7 +103,15 @@ nav .repo:hover strong {
 	background: transparent;
 }
 
+/* the anatomy figure is a diagram, not a photo: on a phone, scroll it rather than shrink it */
+.markdown-body p:has(> img[src$='.svg']) {
+	overflow-x: auto;
+}
 @media (max-width: 767px) {
+	.markdown-body img[src$='.svg'] {
+		max-width: none;
+		width: 720px;
+	}
 	main {
 		padding: 16px 0 48px;
 	}

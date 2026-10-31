@@ -24,7 +24,7 @@ export function load() {
 	const body = readme
 		// the readme opens with a link here and a still of the image; the site shows the video instead
 		.replace(/^\*\*\[watch it boot[^\n]*\n+/m, '')
-		.replace(/^!\[[^\]]*\]\(preview\.png\)\n+/m, '')
+		.replace(/^!\[[^\]]*\]\(docs\/preview\.png\)\n+/m, '')
 		// relative links in the readme point at files in the repo; images stay relative,
 		// because the site serves them itself
 		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}$2)`);

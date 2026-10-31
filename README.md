@@ -6,9 +6,9 @@ an 88 KB image that boots and computes itself.
 
 **[watch it boot →](https://oddurs.github.io/fixpoint)**
 
-![fixpoint.bmp, scaled 3x](preview.png)
+![fixpoint.bmp, scaled 3x](docs/preview.png)
 
-`fixpoint.bmp` is an ordinary 320×200 bitmap. open it in anything and you get the picture above. write it to a disk and boot it, and the cpu draws the same picture again, from scratch, pixel for pixel, without looking. unzip it and it hands you its source.
+`fixpoint.bmp` is an ordinary 320×200 bitmap. open it in anything and you get the picture above. write it to a disk and boot it, and the cpu draws the same picture again, from scratch, byte for byte, without looking. unzip it and it hands you its source.
 
 ```
 qemu-system-i386 -drive format=raw,file=fixpoint.bmp
@@ -47,61 +47,64 @@ the screen is treated as one tape, 64,000 cells long, folded into rows of 320. a
     jb .cell
 ```
 
-booting never reads the picture. it doesn't need to. the bootloader loads three sectors: the header, the palette, and the first row of pixels, which holds the program. the program copies itself into the end of row 0, writes one period of the ether at the start and lets it copy itself across the rest of the row, then computes the other 63,680 pixels.
+booting never reads the picture, apart from the 130 pixels that are the program. it doesn't need the rest. the bootloader loads three sectors: the header, the palette, and the first row of pixels. the program copies itself into the end of row 0, writes one period of the ether at the start and lets it copy itself across the rest of the row, then computes the other 63,680 pixels.
 
 ### what "fixpoint" means, exactly
 
-the fixed point is the pixel array. the 64,000 bytes an image viewer draws are exactly the 64,000 bytes the program writes to the screen, and the program is among them. the header and palette are loaded from the file, not computed. and the program finds its own bytes by reading them from memory, which a quine purist would call cheating. they'd be right. this isn't a quine; it's a file that contains its own output.
+the fixed point is the pixel array. the 64,000 bytes an image viewer draws are exactly the 64,000 bytes the program leaves in video memory, and the program is among them. the header and palette are loaded from the file, not computed. and the program finds its own bytes by reading them from memory, which a quine purist would call cheating. they'd be right. this isn't a quine; it's a file that contains its own output.
 
 rule 110 being turing-complete is a property of the rule, not a claim about this picture: the seed is whatever bytes the program happens to be, so the universe isn't computing anything in particular. it just could.
 
 ## how one file is a picture, a disk, and an archive
 
-![the boot sector, drawn as the palette it lives in, with the cpu's path through it](anatomy.svg)
+![the boot sector, drawn as the palette it lives in, with the cpu's path through it](docs/anatomy.svg)
 
 | offset | as a bmp | as a disk |
 |---|---|---|
 | 0 | `BM` signature | `inc dx; dec bp` |
-| 2 | file size: `EB 5A 01 00` = 88,811 | `jmp short` into the palette |
+| 2 | file size: `EB 59 01 00` = 88,555 | `jmp short` into the palette |
 | 6 | reserved, zero | |
 | 54 | 256-colour palette | the bootloader, woven between colours |
-| 446 | palette entries 62–71 | the partition table, with legal status bytes |
-| 510 | palette entry 72 | `55 AA`, the boot signature |
+| 446 | palette entries `0x62`–`0x71` | the partition table, with legal status bytes |
+| 510 | palette entry `0x72` | `55 AA`, the boot signature |
 | 1078 | pixels | row 0 ends with the program |
 | 65,078 | padding, so the size field is true | a zip of the source, for `unzip` |
 
+ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, all active. it doesn't mention the picture.
+
 - **the file size is a jump instruction.** its low byte is `EB`, `jmp short`, and the next byte is the distance into the palette. the file is padded until the size it claims is true, and the padding holds a zip of `main.asm`, `stub.asm`, and `build.py`, so the file carries its own source.
-- **the boot sector is palette colours.** the signature `55 AA` is the blue and green of entry 72, and the four partition status bytes are blue channels, set to `80` so the partition table is legal and bioses accept the disk. all five entries have bit 6 set, so they're already warm colours: the boot sector moves them by at most 30 levels in any channel. the two bytes every bios looks for first are one of the oranges in the cone. they appear 107 times in the picture, if you know where to look.
-- **the bootloader is woven into the palette.** its 35 bytes would otherwise be 35 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in the figure above, they're the swatches the thread runs through.
+- **the boot sector is palette colours.** the signature `55 AA` is the blue and green of entry `0x72`, and the four partition status bytes are blue channels, set to `80` so the partition table is legal and bioses accept the disk. all five entries have bit 6 set, so they're already warm colours: the boot sector moves them by at most 30 levels in any channel. the two bytes every bios looks for first are one of the oranges in the cone. they appear 107 times in the picture, if you know where to look.
+- **the bootloader is woven into the palette.** its 36 bytes would otherwise be 36 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in the figure above, they're the swatches the thread runs through. [`stub.asm`](stub.asm) writes out every palette entry it hops over, with its colour.
+- **it doesn't care where it starts.** until its final far jump, the bootloader uses only relative jumps, so it runs the same whether the bios starts it at `0000:7C00` or `07C0:0000`.
 - **it stays clear of the bpb.** a bios booting a usb stick as a floppy may rewrite bytes 11–61 in memory. nothing executable lives there, and the program reads the palette from a fresh copy off the disk.
 - **it retries.** a failed disk read loops back to the read, instead of jumping into whatever happened to be in memory.
-- **`B` is `inc dx`.** the bios leaves the boot drive number in `dl`, so the first thing the bootloader does, somewhere, is `dec dx`: it puts back what the `B` took.
+- **`B` is `inc dx`.** the bios leaves the boot drive number in `dl`, so the first thing the bootloader does is `dec dx`: it puts back what the `B` took, before it touches anything else in `dx`.
 
 ## build
 
 needs `nasm`, python 3, and numpy. verifying also needs pillow and `qemu-system-i386`, and uses ffmpeg and chrome when they're installed.
 
 ```
-make            # assemble main.asm, place the stub, write fixpoint.bmp and stub.asm
-make verify     # check every claim above, then boot it and compare the screen
+make            # assemble main.asm, place the stub, write fixpoint.bmp, stub.asm, and the figures
+make verify     # check every claim above, then boot it
 make run        # boot it in a qemu window
 ```
 
-`make verify` checks, with its own implementation of rule 110, that every row follows from the one above and that every cell the program hasn't reached is dark. it checks that pillow, ffmpeg, and chrome decode the same pixels; that the header, signature, and partition table are valid; that the zip inside matches the source in the repo; and it boots the image and compares the screen, all 64,000 pixels. the build is deterministic, and ci rebuilds from source on every push, requires the committed image to be byte-identical, and runs the same checks.
+`make verify` checks, with its own implementation of rule 110, that every row follows from the one above and that every cell the program hasn't reached is dark. it checks that pillow, ffmpeg, and chrome decode the same pixels; that the header, signature, and partition table are valid; and that the zip inside matches the source in the repo. then it boots the image in qemu and reads back video memory: all 64,000 bytes are the file's pixel bytes, and every pixel on screen is the image's colour, at the vga's 6 bits per channel. the build is deterministic, and ci rebuilds from source on every push, requires the committed image to be byte-identical, and runs the same checks.
 
 | file | what it is |
 |---|---|
-| `main.asm` | the program: palette setup, row 0, and the rule 110 loop. assembled with `ORG` and `X0` defined, so it lands exactly at the end of row 0 |
-| `stub.asm` | the bootloader, with the palette bytes it hops over. generated by `build.py`, committed so you can read it |
-| `build.py` | lays out the file, runs the automaton, places the stub |
-| `verify.py` | checks every claim, then boots the image in qemu and diffs the screen |
-| `demo/record.py` | records the demo video: the bios in real time, then the computation under gdb, paused by a breakpoint on the program's own loop every two rows. every frame is the real screen |
-| `demo/anatomy.py` | draws `anatomy.svg`, tracing the cpu's path by disassembling the file |
-| `site/` | the [project page](https://oddurs.github.io/fixpoint), sveltekit, prerendered with no client-side js |
+| [`main.asm`](main.asm) | the program: palette setup, row 0, and the rule 110 loop |
+| [`stub.asm`](stub.asm) | the bootloader, with the palette bytes it hops over. generated by `build.py`, committed so you can read it |
+| [`build.py`](build.py) | lays out the file, runs the automaton, places the stub |
+| [`verify.py`](verify.py) | checks every claim, then boots the image in qemu and reads back video memory |
+| [`demo/record.py`](demo/record.py) | records the demo video: the bios in real time, then the computation under gdb, paused by a breakpoint on the program's own loop every two rows. every frame is the real screen |
+| [`demo/figures.py`](demo/figures.py) | draws the figures in `docs/`, tracing the cpu's path by disassembling the file |
+| [`site/`](site) | the [project page](https://oddurs.github.io/fixpoint), sveltekit, prerendered with no client-side js |
 
-## caveats
+## lineage
 
-verified in qemu with seabios. it has never met real hardware. the partition table is legal and the bpb region is empty, which covers the usual reasons a bios refuses a disk, but bioses vary. if you introduce them, i'd like to know what happens.
+files that are several things at once have a long, strange history; ange albertini's [funky file formats](https://fahrplan.events.ccc.de/congress/2014/Fahrplan/system/attachments/2562/original/Funky_File_Formats.pdf) is the map. the ether, the gliders, and the proof that they can compute anything are [matthew cook's](https://doi.org/10.25088/ComplexSystems.15.1.1).
 
 ## license
 

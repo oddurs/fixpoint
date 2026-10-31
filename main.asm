@@ -10,8 +10,9 @@
 ; from universe to universe, so it is the only thing that can make them disagree.
 ; every cell where they disagree is in the program's causal future.
 ;
-; assembled by build.py with ORG (where this lands in memory) and X0 (where it
-; lands in row 0) defined, so that it ends exactly at the end of the row.
+; assembled by build.py with ORG (where this lands in memory), X0 (where it lands
+; in row 0) and LOAD (where the stub put the file) defined, so that it ends
+; exactly at the end of the row.
 bits 16
 org ORG
 
@@ -26,7 +27,7 @@ main:
     xor al, al
     out dx, al
     inc dx
-    mov si, 0x8000 + 54
+    mov si, LOAD + 54       ; the palette, in the copy the stub loaded
     mov cx, 256
 .pal:
     mov al, [si+2]          ; BMP stores B, G, R, x; the DAC wants R, G, B
