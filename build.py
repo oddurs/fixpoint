@@ -9,8 +9,7 @@ the machine code that computes it. boot the file and it recomputes itself.
   510    55 AA                inside palette entry 0x72, which becomes a highlight
   1078   pixels               row 0 ends with the program; rows 1..199 are its universe
 """
-import os, struct, subprocess
-from PIL import Image
+import math, os, random, struct, subprocess
 
 W, H, PIX = 320, 200, 1078
 SIZE = 0x000102EB
@@ -53,7 +52,6 @@ for b in m: hist[b] += 1
 # independent instructions can be reordered, some have alternate encodings, and
 # harmless one-byte fillers can go anywhere. search for the layout whose bytes,
 # read as (B, G, R, x) palette entries, sit closest to the ramp they replace.
-import random, math
 FILL = {"nop": 0x90, "cld": 0xFC, "clc": 0xF8, "stc": 0xF9, "cmc": 0xF5,
         "inc si": 0x46, "inc di": 0x47, "inc bp": 0x45, "dec si": 0x4E, "dec di": 0x4F}
 FREE = [["dec dx"],                                     # undo "B" = inc dx
