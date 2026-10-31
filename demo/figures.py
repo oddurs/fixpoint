@@ -263,7 +263,7 @@ def anatomy():
         else:                                              # a hop within the palette
             k = max(36, abs(x - px) * 0.32)
             d += " C%.2f %.2f %.2f %.2f %.2f %.2f" % (px + k, py, x - k, y, x, y)
-            labels.append((x - 2.2, y, x - (x - k), 0))
+            labels.append((x - 2.2, y, 1, 0))
     o.append('<path d="%s" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>' % d)
     o.append('<path d="%s" fill="none" stroke="%s" stroke-width="0.9" stroke-linejoin="round"/>' % (d, INK))
     for b, (x, y) in pts:

@@ -256,7 +256,6 @@ def lay_out(pal, start, moves, units, enc, fill, x0):
         elif kind == "hop":
             label += 1
             out[p], out[p + 1] = 0xEB, arg
-            skipped = image[p + 2 - PAL:p + 2 + arg - PAL]
             asm.append("    %-28s; hop over %d bytes of palette" % ("jmp short .h%d" % label, arg))
             asm.extend(palette_lines(image, p + 2, p + 2 + arg))
             asm.append(".h%d:" % label)

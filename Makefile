@@ -2,7 +2,7 @@ PYTHON ?= python3
 
 all: fixpoint.bmp docs/anatomy.svg
 
-# build.py also regenerates stub.asm (the stub is chosen by search)
+# build.py also writes stub.asm: the bootloader is placed by a search, not written by hand
 fixpoint.bmp: main.asm build.py
 	$(PYTHON) build.py
 

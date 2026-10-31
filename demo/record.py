@@ -3,19 +3,24 @@
 the bios is captured in real time. the computation takes a fraction of a second,
 so it is captured under gdb: a breakpoint on the program's own loop pauses the
 machine every two rows, and qemu dumps the screen from there. nothing is rendered
-or interpolated: every frame is the real screen of the real machine. needs qemu-system-i386, gdb, ffmpeg, and pillow.
+or interpolated: every frame is the real screen of the real machine.
 
-usage: python3 demo/record.py   (from the repo root)
-writes site/static/demo.mp4 and site/static/poster.png
+the captions are set in computer modern, from the copies matplotlib ships, like
+figure 1.
+
+usage: python3 demo/record.py   (from the repo root; needs qemu-system-i386, gdb,
+ffmpeg, pillow, matplotlib). writes site/static/demo.mp4 and site/static/poster.png.
 """
 import os, socket, subprocess, tempfile, time
+
+import matplotlib
 from PIL import Image, ImageDraw, ImageFont
 
 BMP = "fixpoint.bmp"
 OUT = "site/static"
+LOAD = 0x8000                                  # where the bootloader puts the file
 W, H, FPS = 960, 600, 30
-BG = (13, 17, 23)
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono%s.ttf"
+CM = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
 
 
 class Monitor:
@@ -73,7 +78,7 @@ def capture_compute(rows_per_frame=2):
     pauses the real machine every few rows, and qemu dumps the screen from there."""
     data = open(BMP, "rb").read()
     loop = data.index(bytes.fromhex("81FF00FA"), 1078, 1078 + 320)   # cmp di, 64000
-    addr = 0x8000 + loop                                             # where the stub loads it
+    addr = LOAD + loop
     tmp = tempfile.mkdtemp()
     script = os.path.join(tmp, "capture.gdb")
     with open(script, "w") as f:
@@ -128,17 +133,19 @@ def fit(im):
     return c
 
 
-bold, mono = ImageFont.truetype(FONT % "-Bold", 17), ImageFont.truetype(FONT % "", 17)
+tt = ImageFont.truetype(os.path.join(CM, "cmtt10.ttf"), 19)
+it = ImageFont.truetype(os.path.join(CM, "cmti10.ttf"), 21)
 
 
 def caption(im, title, sub):
+    """a caption in the lower left: the title in typewriter, a gloss in italic."""
     im = im.copy()
     d = ImageDraw.Draw(im, "RGBA")
-    tw = d.textlength(title, font=bold)
-    d.rounded_rectangle((16, H - 52, 16 + tw + d.textlength("  " + sub, font=mono) + 28, H - 16),
-                        8, fill=(*BG, 225))
-    d.text((30, H - 44), title, font=bold, fill=(240, 246, 252))
-    d.text((30 + tw, H - 44), "  " + sub, font=mono, fill=(139, 148, 158))
+    tw = d.textlength(title, font=tt)
+    sw = d.textlength(sub, font=it)
+    d.rectangle((18, H - 54, 18 + tw + sw + 46, H - 18), fill=(0, 0, 0, 215))
+    d.text((32, H - 44), title, font=tt, fill=(255, 255, 255))
+    d.text((32 + tw + 14, H - 46), sub, font=it, fill=(196, 192, 182))
     return im
 
 
@@ -154,9 +161,9 @@ def main():
 
     cmd = "$ qemu-system-i386 -drive format=raw,file=fixpoint.bmp"
     for i in range(0, len(cmd) + 2, 2):
-        c = Image.new("RGB", (W, H), BG)
+        c = Image.new("RGB", (W, H), (0, 0, 0))
         ImageDraw.Draw(c).text((40, H // 2 - 12), cmd[:i] + ("_" if i < len(cmd) else ""),
-                               font=mono, fill=(240, 246, 252))
+                               font=tt, fill=(255, 255, 255))
         out.append(c)
     hold(out[-1], 0.6)
 

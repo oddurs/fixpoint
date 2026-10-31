@@ -67,7 +67,7 @@ rule 110 being turing-complete is a property of the rule, not a claim about this
 | 54 | 256-colour palette | the bootloader, woven between colours |
 | 446 | palette entries `0x62`–`0x71` | the partition table, with legal status bytes |
 | 510 | palette entry `0x72` | `55 AA`, the boot signature |
-| 1078 | pixels | row 0 ends with the program |
+| 1078 | pixels | row 0: the ether, then the program |
 | 65,078 | padding, so the size field is true | a zip of the source, for `unzip` |
 
 ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, all active. it doesn't mention the picture.
@@ -88,6 +88,8 @@ needs `nasm`, python 3, and the packages in `requirements.txt`. verifying also n
 make            # build fixpoint.bmp, stub.asm, and the figures
 make verify     # check every claim above, then boot it
 make run        # boot it in a qemu window
+make demo       # re-record the video (needs gdb and ffmpeg)
+make site       # build the project page into site/build
 ```
 
 `make verify` checks, with its own implementation of rule 110, that every row follows from the one above and that every cell the program hasn't reached is dark. it checks that pillow, ffmpeg, and chrome decode the same pixels; that the header, signature, and partition table are valid; and that the zip inside matches the source in the repo. then it boots the image in qemu and reads back video memory: all 64,000 bytes are the file's pixel bytes, and every pixel on screen is the image's colour, at the vga's 6 bits per channel. the build is deterministic, and ci rebuilds from source on every push, requires the committed image to be byte-identical, and runs the same checks.
