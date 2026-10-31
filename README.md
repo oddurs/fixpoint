@@ -85,7 +85,7 @@ ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, a
 needs `nasm`, python 3, and the packages in `requirements.txt`. verifying also needs `qemu-system-i386`, and uses ffmpeg and chrome when they're installed.
 
 ```
-make            # assemble main.asm, place the stub, write fixpoint.bmp, stub.asm, and the figures
+make            # build fixpoint.bmp, stub.asm, and the figures
 make verify     # check every claim above, then boot it
 make run        # boot it in a qemu window
 ```

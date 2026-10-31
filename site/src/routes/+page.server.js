@@ -1,42 +1,56 @@
+// the page is the readme, rendered at build time. the readme's head (title, tagline,
+// intro) is replaced by the post's own; everything from its first section on is the
+// body. nothing here runs in the browser: the page ships no javascript.
+
 import { execSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js/lib/core';
-import x86asm from 'highlight.js/lib/languages/x86asm';
 import readme from '../../../README.md?raw';
-
-hljs.registerLanguage('x86asm', x86asm);
-
-const marked = new Marked(
-	{ gfm: true },
-	markedHighlight({
-		emptyLangClass: 'hljs',
-		langPrefix: 'hljs language-',
-		highlight(code, lang) {
-			const language = lang === 'nasm' ? 'x86asm' : lang;
-			return hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : code;
-		}
-	})
-);
 
 const repo = 'https://github.com/oddurs/fixpoint';
 const root = process.cwd() + '/../'; // the build runs in site/
 
-/** the date git last touched a path, or the date of the build */
-function touched(path, format = '%cI') {
-	try {
-		const out = execSync(`git log -1 --format=${format} -- ${path}`, { cwd: root }).toString().trim();
-		if (out) return out;
-	} catch {}
-	return new Date().toISOString();
+const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** nasm the way the listings package sets it: mnemonics bold, labels quiet, comments
+    in italic roman, and one span per line so css can number them. */
+function nasm(code) {
+	return code
+		.replace(/\n$/, '')
+		.split('\n')
+		.map((line) => {
+			const at = line.indexOf(';');
+			const [src, comment] = at < 0 ? [line, ''] : [line.slice(0, at), line.slice(at)];
+			const [, indent, label = '', gap, op = '', rest] = src.match(/^(\s*)(\.?[\w.]+:)?(\s*)([a-z]+\b)?(.*)$/i);
+			return (
+				'<span class="ln">' +
+				escape(indent) +
+				(label && `<span class="label">${escape(label)}</span>`) +
+				escape(gap) +
+				(op && `<b class="op">${op}</b>`) +
+				escape(rest) +
+				(comment && `<span class="com">${escape(comment)}</span>`) +
+				'</span>'
+			);
+		})
+		.join('\n');
 }
 
-/** sizes the way a 2003 directory listing would print them */
-function size(path) {
-	const n = statSync(root + path).size;
-	return n < 1024 ? `${n}` : n < 1024 * 1024 ? `${Math.round(n / 1024)}K` : `${(n / 1024 / 1024).toFixed(1)}M`;
-}
+/** a shell block: comments set like the assembly's */
+const shell = (code) =>
+	code
+		.split('\n')
+		.map((line) => escape(line).replace(/(\s#.*)$/, '<span class="com">$1</span>'))
+		.join('\n');
+
+const marked = new Marked(
+	{ gfm: true },
+	markedHighlight({
+		langPrefix: 'language-',
+		highlight: (code, lang) => (lang === 'nasm' ? nasm(code) : shell(code))
+	})
+);
 
 /** tex quotes: curly quotes and apostrophes in prose, never inside code */
 function smart(html) {
@@ -53,51 +67,57 @@ function smart(html) {
 			return part
 				.replace(/&quot;/g, '"')
 				.replace(/&#39;/g, "'")
-				.replace(/(^|[\s(\[{—–])"/g, '$1\u201c')
-				.replace(/"/g, '\u201d')
-				.replace(/(^|[\s(\[{—–])'/g, '$1\u2018')
-				.replace(/'/g, '\u2019');
+				.replace(/(^|[\s(\[{—–])"/g, '$1“')
+				.replace(/"/g, '”')
+				.replace(/(^|[\s(\[{—–])'/g, '$1‘')
+				.replace(/'/g, '’');
 		})
 		.join('');
 }
 
 const slug = (s) =>
 	s
+		.replace(/<[^>]+>|&[^;]+;/g, '')
 		.toLowerCase()
-		.replace(/<[^>]+>/g, '')
-		.replace(/&[^;]+;/g, '')
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-|-$/g, '');
 
+/** the date git last touched a path (the pages workflow fetches full history) */
+function touched(path, format = '%cI') {
+	try {
+		const out = execSync(`git log -1 --format=${format} -- ${path}`, { cwd: root }).toString().trim();
+		if (out) return out;
+	} catch {}
+	return new Date().toISOString();
+}
+
+/** a file's size, the way a 2003 directory listing would print it */
+function size(path) {
+	const n = statSync(root + path).size;
+	return n < 1024 ? `${n}` : n < 1048576 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
+}
+
+/** width and height for the readme's images, from their own viewBox, so nothing shifts as they load */
+function dimensions(html) {
+	return html.replace(/<img src="([^"]+\.svg)"/g, (tag, src) => {
+		const [, , w, h] = readFileSync(root + src, 'utf8').match(/viewBox="([\d.]+ [\d.]+ )?([\d.]+) ([\d.]+)"/);
+		return `${tag} width="${Math.round(w)}" height="${Math.round(h)}" loading="lazy" decoding="async"`;
+	});
+}
+
 export function load() {
-	// the readme's head becomes the title matter; everything from the first section on is the paper
 	const cut = readme.indexOf('\n## ');
 	const head = readme.slice(0, cut);
 	const body = readme
 		.slice(cut + 1)
-		// the license is in the footer, and appendix a lists the files
-		.replace(/\n## license[\s\S]*$/, '\n')
-		.replace(/\n\| file \| what it is \|\n(\|.*\n)+/, '\n')
-		// relative links point at files in the repo; images stay relative, the site serves them
-		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}/blob/main/$2)`);
+		.replace(/\n## license[\s\S]*$/, '\n') // the footer has the license
+		.replace(/\n\| file \| what it is \|\n(\|.*\n)+/, '\n') // the files section lists them
+		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}/blob/main/$2)`); // repo links
 
-	const epigraph = head.match(/^\*(.+)\*$/m)[1];
-	const abstract = smart(
-		marked.parseInline(head.match(/^`fixpoint\.bmp` is .*$/m)[0].replace('the picture above', 'the picture in figure 0'))
+	const html = dimensions(smart(marked.parse(body))).replace(
+		/<h([23])>([\s\S]*?)<\/h\1>/g,
+		(_, level, text) => `<h${level} id="${slug(text)}">${text}</h${level}>`
 	);
-	const commands = head.match(/```\n([\s\S]*?)```/)[1];
-
-	// number the sections the way latex would, and give them anchors for the contents
-	const toc = [];
-	let n = 0,
-		m = 0;
-	const html = smart(marked.parse(body)).replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_, level, text) => {
-		const id = slug(text);
-		const num = level === '2' ? `${++n}` : `${n}.${++m}`;
-		if (level === '2') m = 0;
-		toc.push({ level: +level, num, id, text });
-		return `<h${level} id="${id}"><span class="secnum">${num}</span>${text}</h${level}>`;
-	});
 
 	const files = [
 		['fixpoint.bmp', 'fixpoint.bmp', 'the image, the disk, the archive'],
@@ -105,10 +125,10 @@ export function load() {
 		['stub.asm', `${repo}/blob/main/stub.asm`, 'the bootloader, woven into the palette'],
 		['build.py', `${repo}/blob/main/build.py`, 'lays out the file, places the stub'],
 		['verify.py', `${repo}/blob/main/verify.py`, 'checks every claim, then boots it'],
-		['demo/record.py', `${repo}/blob/main/demo/record.py`, 'records figure 0 under gdb'],
+		['demo/record.py', `${repo}/blob/main/demo/record.py`, 'records the video under gdb'],
 		['demo/figures.py', `${repo}/blob/main/demo/figures.py`, 'draws figure 1 from the file'],
 		['docs/anatomy.svg', 'docs/anatomy.svg', 'figure 1'],
-		['site/static/demo.mp4', 'demo.mp4', 'figure 0']
+		['site/static/demo.mp4', 'demo.mp4', 'the video']
 	].map(([path, href, what]) => ({
 		name: path.replace('site/static/', ''),
 		href,
@@ -119,14 +139,15 @@ export function load() {
 
 	const modified = new Date(touched('.'));
 	return {
-		epigraph: smart(epigraph),
-		abstract,
-		commands,
+		tagline: smart(head.match(/^\*(.+)\*$/m)[1]),
+		commands: head.match(/```\n([\s\S]*?)```/)[1].trim().split('\n'),
 		html,
-		toc,
 		files,
-		date: modified.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }),
-		modified: modified.toUTCString().replace(' GMT', ' UTC'),
+		iso: modified.toISOString(),
+		date: modified
+			.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+			.toLowerCase(),
+		modified: modified.toUTCString().replace('GMT', 'UTC'),
 		video: size('site/static/demo.mp4'),
 		bmp: statSync(root + 'fixpoint.bmp').size.toLocaleString('en-US')
 	};

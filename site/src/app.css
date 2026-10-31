@@ -1,18 +1,16 @@
-/* a home page a professor might have set in 2003: latin modern, a text block of
-   about 66 characters, justified and hyphenated, numbered sections, booktabs
-   tables, and links that are blue and underlined because that is what links are. */
+/* a personal page set like it's 2003 and the author owns a copy of the texbook:
+   latin modern, a text block of about 65 characters, justified and hyphenated,
+   booktabs tables, listings-style code, and links that are blue and underlined
+   because that is what links are. light only. */
 
 @font-face {
 	font-family: 'FP LM Roman';
 	src: url('./fonts/fp-lmroman10-regular.woff2') format('woff2');
-	font-weight: 400;
-	font-style: normal;
 	font-display: swap;
 }
 @font-face {
 	font-family: 'FP LM Roman';
 	src: url('./fonts/fp-lmroman10-italic.woff2') format('woff2');
-	font-weight: 400;
 	font-style: italic;
 	font-display: swap;
 }
@@ -20,19 +18,6 @@
 	font-family: 'FP LM Roman';
 	src: url('./fonts/fp-lmroman10-bold.woff2') format('woff2');
 	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
-}
-@font-face {
-	font-family: 'FP LM Roman';
-	src: url('./fonts/fp-lmroman10-bolditalic.woff2') format('woff2');
-	font-weight: 700;
-	font-style: italic;
-	font-display: swap;
-}
-@font-face {
-	font-family: 'FP LM Roman Caps';
-	src: url('./fonts/fp-lmromancaps10-regular.woff2') format('woff2');
 	font-display: swap;
 }
 @font-face {
@@ -40,49 +25,79 @@
 	src: url('./fonts/fp-lmmono10-regular.woff2') format('woff2');
 	font-display: swap;
 }
+@font-face {
+	font-family: 'FP LM Mono';
+	src: url('./fonts/fp-lmmonolt10-bold.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}
 
 :root {
-	--ink: #111;
-	--grey: #555;
+	--ink: #0b0b0b;
+	--grey: #57534a;
+	--faint: #9b968a;
 	--rule: #111;
 	--paper: #fff;
+	--shade: #f7f6f2;
+	--edge: #d8d4c7;
 	--link: #0000ee;
 	--visited: #551a8b;
 	--cardinal: #8c1515;
 	--serif: 'FP LM Roman', 'Latin Modern Roman', 'CMU Serif', 'Times New Roman', Times, serif;
-	--caps: 'FP LM Roman Caps', 'Latin Modern Roman Caps', var(--serif);
 	--mono: 'FP LM Mono', 'Latin Modern Mono', 'CMU Typewriter Text', 'Courier New', monospace;
+	--measure: 42rem;
+	--wide: min(calc(100vw - 32px), 60rem);
 	color-scheme: light;
 }
+
+/* --- the page */
 
 html {
 	background: var(--paper);
 	color: var(--ink);
 	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
 }
 body {
 	margin: 0;
-	font: 19px/1.5 var(--serif);
+	font: 20px/1.55 var(--serif);
 	font-kerning: normal;
 	font-variant-ligatures: common-ligatures;
 	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+::selection {
+	background: #f1dcdc;
 }
 
 a {
 	color: var(--link);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.14em;
 }
 a:visited {
 	color: var(--visited);
 }
+a:hover {
+	text-decoration-thickness: 2px;
+}
 
 .tt,
-code,
-pre {
+code {
 	font-family: var(--mono);
-	font-size: 0.94em;
+	font-size: 0.92em;
+	hyphens: none;
+}
+
+main {
+	box-sizing: border-box;
+	max-width: var(--measure);
+	margin: 0 auto;
+	padding: 52px 16px 64px;
 }
 
 /* --- the masthead: verdana, small, the way departmental pages were */
+
 .masthead {
 	display: flex;
 	flex-wrap: wrap;
@@ -96,70 +111,51 @@ pre {
 	color: #333;
 }
 
-main {
-	box-sizing: border-box;
-	max-width: 42rem;
-	margin: 0 auto;
-	padding: 48px 16px 64px;
-}
+/* --- the post: a title, a byline, a line under it, and a lead */
 
-/* --- \maketitle */
-.maketitle {
-	text-align: center;
-	margin: 12px 0 28px;
+.post {
+	margin: 0 0 26px;
 }
-.maketitle h1 {
-	max-width: 15em;
-	margin-left: auto !important;
-	margin-right: auto !important;
-	text-wrap: balance;
+.post h1 {
+	margin: 0 0 10px;
+	font-size: 1.6em;
 	font-weight: 400;
-	font-size: 1.72em;
-	line-height: 1.25;
-	margin: 0 0 22px;
+	line-height: 1.22;
+	text-wrap: balance;
 }
-.maketitle h1 .tt {
+.post h1 .tt {
 	font-size: 1em;
 }
-.maketitle p {
-	margin: 0 0 6px;
-	font-size: 1.12em;
-}
-
-.epigraph {
-	margin: 0 0 28px auto;
-	width: 60%;
-	font-style: italic;
-	text-align: right;
-	padding-bottom: 6px;
-	border-bottom: 0.5px solid var(--rule);
-}
-
-/* --- \begin{abstract} */
-.abstract {
-	margin: 0 2.4em 30px;
-	font-size: 0.9em;
-	text-align: justify;
-	hyphens: auto;
-}
-.abstract h2 {
-	font-size: 1em;
-	font-weight: 700;
-	text-align: center;
-	margin: 0 0 6px;
-}
-.abstract p {
+.byline {
 	margin: 0;
-	text-indent: 1.5em;
+	color: var(--grey);
+	font-size: 0.9em;
+}
+.tagline {
+	margin: 18px 0 0;
+	padding-top: 12px;
+	border-top: 0.5px solid var(--rule);
+	font-style: italic;
 }
 
-/* --- figures. a figure may be wider than the text, like figure* in two-column latex */
-figure {
-	margin: 28px 0 30px;
+.lead {
+	margin: 0 0 14px;
+	font-size: 1.1em;
+	line-height: 1.5;
+	text-wrap: pretty;
 }
-figure.wide,
-.paper p:has(> img[src$='.svg']) {
-	width: min(calc(100vw - 32px), 960px);
+.aside {
+	margin: 0 0 6px;
+}
+
+/* --- figures may be wider than the text, like figure* in two-column latex */
+
+figure {
+	margin: 26px 0 30px;
+}
+.wide,
+.body p:has(> img) {
+	width: var(--wide);
 	margin-left: 50%;
 	transform: translateX(-50%);
 }
@@ -167,163 +163,131 @@ figure video {
 	display: block;
 	width: 100%;
 	height: auto;
-	aspect-ratio: 16 / 10;
+	aspect-ratio: 8 / 5;
 	background: #000;
 }
 figcaption {
-	max-width: 42rem;
+	max-width: var(--measure);
+	box-sizing: border-box;
 	margin: 10px auto 0;
 	padding: 0 16px;
-	box-sizing: border-box;
-	font-size: 0.84em;
-	line-height: 1.4;
-	text-align: justify;
-	hyphens: auto;
+	color: var(--grey);
+	font-size: 0.8em;
+	line-height: 1.45;
 }
-.paper p:has(> img[src$='.svg']) {
+.body p:has(> img) {
 	overflow-x: auto;
+	margin-block: 30px;
 	text-indent: 0;
-	margin-top: 28px;
-	margin-bottom: 28px;
 }
-.paper img {
-	max-width: 100%;
-}
-.paper img[src$='.svg'] {
+.body img {
 	display: block;
 	width: 100%;
 	min-width: 720px;
 	height: auto;
 }
 
-.noindent {
-	margin: 0 0 4px;
-}
+/* --- the body: justified, hyphenated, indented paragraphs */
 
-pre {
-	margin: 10px 0 22px;
-	padding: 0 0 0 1.5em;
-	line-height: 1.35;
-	overflow-x: auto;
-	white-space: pre;
-	background: none;
-}
-pre.commands,
-pre.bibtex,
-.paper pre {
-	font-size: 0.86em;
-}
-@media (min-width: 1100px) {
-	.paper pre {
-		margin-right: -12rem;              /* an overfull hbox, on purpose */
-	}
-}
-
-/* --- \tableofcontents */
-.contents {
-	margin: 34px 0 10px;
-}
-.contents h2 {
-	font-size: 1.3em;
-	margin: 0 0 10px;
-}
-.contents ol {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-}
-.contents li {
-	display: flex;
-	margin: 2px 0;
-}
-.contents .num {
-	flex: 0 0 2.2em;
-}
-.contents li.level2 {
-	font-weight: 700;
-	margin-top: 8px;
-}
-.contents li.level3 {
-	padding-left: 2.2em;
-}
-.contents li.level3 .num {
-	flex-basis: 2.6em;
-}
-.contents a,
-.contents a:visited {
-	color: var(--ink);
-	text-decoration: none;
-}
-.contents a:hover {
-	text-decoration: underline;
-}
-
-/* --- the paper: numbered sections, justified text, indented paragraphs */
-.paper {
+.body {
 	text-align: justify;
 	hyphens: auto;
+	hyphenate-limit-chars: 6 3 2;
 }
-.paper h2,
-.paper h3 {
-	display: flex;
-	text-align: left;
-	hyphens: manual;
-	line-height: 1.25;
-}
-.paper h2 {
-	font-size: 1.3em;
-	margin: 40px 0 12px;
-}
-.paper h3 {
-	font-size: 1.08em;
-	margin: 28px 0 8px;
-}
-.paper h2::first-letter,
-.paper h3::first-letter {
-	text-transform: uppercase;
-}
-.secnum {
-	flex: 0 0 2.2em;                       /* a hanging indent, as latex sets section titles */
-}
-.paper h3 .secnum {
-	flex-basis: 2.6em;
-}
-.paper p {
+.body p {
 	margin: 0;
+	text-wrap: pretty;
 }
-.paper p + p {
+.body p + p {
 	text-indent: 1.5em;
 }
-.paper ul {
-	margin: 8px 0 12px;
-	padding-left: 1.5em;
+.body h2,
+.body h3 {
+	margin: 2em 0 0.55em;
+	line-height: 1.25;
+	text-align: left;
+	text-wrap: balance;
+	hyphens: manual;
 }
-.paper li {
-	margin: 4px 0;
+.body h2 {
+	font-size: 1.28em;
 }
-.paper code {
-	font-size: 0.94em;
+.body h3 {
+	font-size: 1.05em;
 }
-
-/* listings-style highlighting: keywords bold, comments italic, nothing coloured */
-.hljs-keyword,
-.hljs-built_in {
-	font-weight: 700;
+.body ul {
+	margin: 0.6em 0 0.8em;
+	padding-left: 1.3em;
 }
-.hljs-comment {
-	font-family: var(--serif);
-	font-style: italic;
+.body li {
+	margin: 0.3em 0;
+	padding-left: 0.15em;
+}
+.body li::marker {
 	color: var(--grey);
 }
 
+/* --- code, as the listings package sets it: a quiet frame, numbered lines,
+   bold mnemonics, comments in italic roman */
+
+pre {
+	box-sizing: border-box;
+	width: var(--wide);
+	max-width: 48rem;
+	margin: 1em 0 1.4em 50%;
+	transform: translateX(-50%);
+	padding: 0.8em 1.1em;
+	overflow-x: auto;
+	background: var(--shade);
+	border-left: 2px solid var(--edge);
+	font: 0.8em/1.55 var(--mono);
+	text-align: left;
+	hyphens: none;
+	tab-size: 4;
+}
+pre code {
+	font: inherit;
+	counter-reset: line;
+}
+.ln::before {
+	counter-increment: line;
+	content: counter(line);
+	display: inline-block;
+	width: 1.4em;
+	margin-right: 1.3em;
+	color: var(--faint);
+	font: 0.8em var(--serif);
+	text-align: right;
+	user-select: none;
+}
+.op {
+	font-weight: 700;
+}
+.label {
+	color: var(--grey);
+}
+.com {
+	color: var(--grey);
+	font-family: var(--serif);
+	font-size: 1.08em;
+	font-style: italic;
+	line-height: 1; /* a larger face mustn't open up its line */
+}
+.prompt {
+	color: var(--faint);
+	user-select: none;
+}
+
 /* --- booktabs: three rules, no verticals, no stripes */
+
 table {
+	margin: 1.2em auto 1.5em;
 	border-collapse: collapse;
-	margin: 18px auto 22px;
-	font-size: 0.86em;
-	line-height: 1.35;
+	font-size: 0.84em;
+	line-height: 1.38;
 	text-align: left;
 	hyphens: manual;
+	font-variant-numeric: tabular-nums;
 }
 thead tr {
 	border-top: 1.5px solid var(--rule);
@@ -333,8 +297,8 @@ tbody tr:last-child {
 	border-bottom: 1.5px solid var(--rule);
 }
 th {
-	font-weight: 400;
 	font-style: italic;
+	font-weight: 400;
 }
 th,
 td {
@@ -348,20 +312,22 @@ td:first-child {
 .r {
 	text-align: right;
 }
-table.listing td:nth-child(2),
-table.listing td:nth-child(3) {
+.listing td:nth-child(2),
+.listing td:nth-child(3) {
 	white-space: nowrap;
 }
 
+/* --- the footer */
+
 footer {
 	margin-top: 56px;
-	font-size: 0.8em;
 	color: var(--grey);
+	font-size: 0.78em;
 }
 footer hr {
+	margin: 0 0 10px;
 	border: 0;
 	border-top: 0.5px solid var(--rule);
-	margin: 0 0 10px;
 }
 footer p {
 	margin: 0;
@@ -369,18 +335,12 @@ footer p {
 
 @media (max-width: 640px) {
 	body {
-		font-size: 17px;
+		font-size: 17.5px;
 	}
 	main {
-		padding-top: 28px;
+		padding-top: 30px;
 	}
-	.abstract {
-		margin: 0 0 26px;
-	}
-	.epigraph {
-		width: 80%;
-	}
-	.paper table {
+	.body table {
 		display: block;
 		overflow-x: auto;
 	}
