@@ -67,8 +67,7 @@
 	</header>
 
 	<p class="lead">
-		i made a picture that is also a program. <a href={asset('/fixpoint.bmp')} class="tt">fixpoint.bmp</a> is an
-		ordinary 320&times;200 bitmap: open it in anything and it&rsquo;s an image. write it to a disk and boot it, and
+		<a href={asset('/fixpoint.bmp')} class="tt">fixpoint.bmp</a> is an ordinary 320&times;200 bitmap: open it in anything and it&rsquo;s an image. write it to a disk and boot it, and
 		the cpu draws the same image again, byte for byte, without looking. unzip it and it hands you its own source. the
 		picture is rule 110 running through its ether, disturbed by 130 bytes of code hiding in the top row, and what
 		you&rsquo;re looking at is that code&rsquo;s light cone: everywhere its influence has reached so far.
