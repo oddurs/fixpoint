@@ -5,16 +5,25 @@
     "build": "vite build",
     "preview": "vite preview",
     "prebuild": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/anatomy.svg static/docs/",
-    "predev": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/anatomy.svg static/docs/"
+    "predev": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/anatomy.svg static/docs/",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint ."
   },
   "private": "true",
   "type": "module",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/adapter-static": "^4.0.1",
     "@sveltejs/kit": "^3.1.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-svelte": "^3.23.1",
+    "globals": "^17.14.0",
     "marked": "^18.1.2",
     "marked-highlight": "^2.2.4",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.3",
     "vite": "^8.3.5"
   }

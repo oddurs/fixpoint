@@ -114,7 +114,11 @@ main {
 	border-top: 5px solid var(--cardinal);
 	border-bottom: 1px solid #ccc;
 	background: #f4f4f0;
-	font: 12px/1.4 Verdana, Geneva, Tahoma, sans-serif;
+	font:
+		12px/1.4 Verdana,
+		Geneva,
+		Tahoma,
+		sans-serif;
 	color: #333;
 }
 

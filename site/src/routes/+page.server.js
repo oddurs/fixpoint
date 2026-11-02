@@ -8,7 +8,6 @@ import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import post from '../post.md?raw';
 
-const repo = 'https://github.com/oddurs/fixpoint';
 const root = process.cwd() + '/../'; // the build runs in site/
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -67,9 +66,9 @@ function smart(html) {
 			return part
 				.replace(/&quot;/g, '"')
 				.replace(/&#39;/g, "'")
-				.replace(/(^|[\s(\[{—–])"/g, '$1“')
+				.replace(/(^|[\s([{—–])"/g, '$1“')
 				.replace(/"/g, '”')
-				.replace(/(^|[\s(\[{—–])'/g, '$1‘')
+				.replace(/(^|[\s([{—–])'/g, '$1‘')
 				.replace(/'/g, '’');
 		})
 		.join('');
@@ -82,13 +81,11 @@ const slug = (s) =>
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-|-$/g, '');
 
-/** the date git last touched a path (the pages workflow fetches full history) */
+/** the date git last touched a path (the pages workflow fetches full history). a path
+    with no history yet is new: it was last touched now. a git failure fails the build. */
 function touched(path, format = '%cI') {
-	try {
-		const out = execSync(`git log -1 --format=${format} -- ${path}`, { cwd: root }).toString().trim();
-		if (out) return out;
-	} catch {}
-	return new Date().toISOString();
+	const out = execSync(`git log -1 --format=${format} -- ${path}`, { cwd: root }).toString().trim();
+	return out || new Date().toISOString();
 }
 
 /** a file's size, the way a 2003 directory listing would print it */
@@ -101,7 +98,9 @@ function size(path) {
     you point at it (see demo/figures.py), and that only works in the page, not in an <img> */
 function inline(html) {
 	return html.replace(/<p><img src="([^"]+\.svg)" alt="([^"]*)"\s*\/?><\/p>/g, (_, src, alt) => {
-		const svg = readFileSync(root + src, 'utf8').trim().replace('<svg ', `<svg aria-label="${alt}" `);
+		const svg = readFileSync(root + src, 'utf8')
+			.trim()
+			.replace('<svg ', `<svg aria-label="${alt}" `);
 		const full = `<a class="full" href="/${src}">open figure 1 on its own, full size</a>`;
 		const point = '<span class="point">point at an instruction or a byte of the path to find the other.</span>';
 		return `<p class="figure">${svg}</p>\n<p class="hint">${point}${full}</p>`;
@@ -114,19 +113,21 @@ export function load() {
 		(_, level, text) => `<h${level} id="${slug(text)}">${text}</h${level}>`
 	);
 
+	// [path in the repo, path served by the site or null if it links to the repo, gloss]
 	const files = [
 		['fixpoint.bmp', 'fixpoint.bmp', 'the image, the disk, the archive'],
-		['main.asm', `${repo}/blob/main/main.asm`, 'the program, 130 bytes of it'],
-		['stub.asm', `${repo}/blob/main/stub.asm`, 'the bootloader, woven into the palette'],
-		['build.py', `${repo}/blob/main/build.py`, 'lays out the file, places the stub'],
-		['verify.py', `${repo}/blob/main/verify.py`, 'checks every claim, then boots it'],
-		['demo/record.py', `${repo}/blob/main/demo/record.py`, 'records the video under gdb'],
-		['demo/figures.py', `${repo}/blob/main/demo/figures.py`, 'draws figure 1 from the file'],
+		['main.asm', null, 'the program, 130 bytes of it'],
+		['stub.asm', null, 'the bootloader, woven into the palette'],
+		['build.py', null, 'lays out the file, places the stub'],
+		['verify.py', null, 'checks every claim, then boots it'],
+		['demo/record.py', null, 'records the video under gdb'],
+		['demo/figures.py', null, 'draws figure 1 from the file'],
 		['docs/anatomy.svg', 'docs/anatomy.svg', 'figure 1'],
 		['site/static/demo.mp4', 'demo.mp4', 'the video']
-	].map(([path, href, what]) => ({
+	].map(([path, served, what]) => ({
 		name: path.replace('site/static/', ''),
-		href,
+		path,
+		served,
 		what,
 		date: touched(path, '%cs'),
 		size: size(path)
