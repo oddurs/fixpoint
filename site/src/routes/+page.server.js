@@ -114,7 +114,7 @@ export function load() {
 	const body = readme
 		.slice(cut + 1)
 		.replace(/\n## license[\s\S]*$/, '\n') // the footer has the license
-		.replace(/\n\| file \| what it is \|\n(\|.*\n)+/, '\n') // the files section lists them
+		.replace(/\n## build\n[\s\S]*?(?=\n## )/, '\n') // how to build it is the repo's business, not the post's
 		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}/blob/main/$2)`); // repo links
 
 	const html = inline(smart(marked.parse(body))).replace(
