@@ -86,6 +86,8 @@ ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, a
 
 needs `nasm`, python 3, and the packages in `requirements.txt`. verifying also needs `qemu-system-i386`, and uses ffmpeg and chrome when they're installed.
 
+`scripts/setup` readies a clone: git hooks, a python environment, a toolchain check. `scripts/task check` runs everything ci runs.
+
 ```
 make            # build fixpoint.bmp, stub.asm, and the figures
 make verify     # check every claim above, then boot it

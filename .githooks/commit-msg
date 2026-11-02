@@ -1,0 +1,24 @@
+#!/bin/sh
+# conventional commits, subject at most 72 characters, no trailing period, and no
+# assistant attribution: the work is published under the owner's name.
+set -eu
+
+subject=$(sed -n '/^[^#]/{p;q;}' "$1")
+case "$subject" in
+Merge\ * | Revert\ * | fixup!\ * | squash!\ * | amend!\ *) exit 0 ;;
+esac
+
+fail() {
+	echo "commit-msg: $1" >&2
+	echo "  $subject" >&2
+	exit 1
+}
+
+echo "$subject" | grep -Eq '^(feat|fix|chore|docs|perf|refactor|test|ci|build|revert)(\([a-z0-9._/-]+\))?!?: [^ ]' ||
+	fail "not a conventional commit: <type>(<scope>): <subject>"
+[ "${#subject}" -le 72 ] || fail "the subject is ${#subject} characters; keep it to 72"
+case "$subject" in *.) fail "no trailing period on the subject" ;; esac
+# the repo's own CLAUDE.md is a filename, not a credit, so it's struck out before matching
+if grep -v '^#' "$1" | sed 's/[Cc][Ll][Aa][Uu][Dd][Ee]\.[Mm][Dd]//g' | grep -Eiq 'claude|anthropic|🤖'; then
+	fail "no assistant attribution in commit messages"
+fi

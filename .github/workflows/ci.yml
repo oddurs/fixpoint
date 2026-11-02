@@ -2,45 +2,43 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  build-and-boot:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the site's file listing dates each file from git
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: install nasm, qemu, ffmpeg, and the python requirements
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y nasm qemu-system-x86 ffmpeg
-          pip install -r requirements.txt
-      - name: rebuild from source
-        run: |
-          python3 build.py
-          python3 demo/figures.py
-      - name: the committed image and figure are exactly what the source builds
-        run: git diff --exit-code -- fixpoint.bmp stub.asm docs/anatomy.svg
-      - name: check every claim (decoders, disk, archive) and boot it
-        run: python3 verify.py
-
-  # pages builds the site only after a merge to main; build it here so a pull
-  # request that breaks it fails before then
-  site:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+          cache: pip
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
-      - name: build the site
-        working-directory: site
+      - name: install nasm, qemu, ffmpeg, and the python requirements
         run: |
-          npm ci
-          npm run build
+          sudo apt-get update
+          sudo apt-get install -y nasm qemu-system-x86 ffmpeg
+          pip install -r requirements.txt
+      - run: ./scripts/task check
+
+  # the one status check branch protection names, so adding jobs never means editing it
+  required:
+    if: always()
+    needs: [check]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.check.result }}" = success

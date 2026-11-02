@@ -1,0 +1,5 @@
+#!/bin/sh
+# the fast checks; the full suite runs before a push
+set -eu
+scripts/task fmt:check
+scripts/task lint

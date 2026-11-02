@@ -17,10 +17,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      stamp: ${{ steps.stamp.outputs.iso }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # the file listing shows when each file last changed
+      # the page prints its last commit's time; finding it live proves this build is live
+      - id: stamp
+        run: echo "iso=$(date -u -d "$(git log -1 --format=%cI)" +%Y-%m-%dT%H:%M:%S.000Z)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -44,3 +49,17 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: the live page is this build
+        env:
+          URL: ${{ steps.deployment.outputs.page_url }}
+          STAMP: ${{ needs.build.outputs.stamp }}
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${URL}?v=${GITHUB_SHA}" | grep -q "datetime=\"${STAMP}\""; then
+              echo "live: ${URL} (${STAMP})"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "after five minutes ${URL} still isn't the build from ${STAMP}" >&2
+          exit 1
