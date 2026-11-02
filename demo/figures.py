@@ -18,8 +18,11 @@ everywhere, including on github.
 
 usage: python3 demo/figures.py   (from the repo root; needs ndisasm, pillow, matplotlib)
 """
-import os, subprocess
-from functools import lru_cache
+
+import os
+import subprocess
+from functools import cache
+from pathlib import Path
 
 import matplotlib
 from fontTools.pens.svgPathPen import SVGPathPen
@@ -29,16 +32,18 @@ from PIL import Image
 BMP, OUT, PREVIEW = "fixpoint.bmp", "docs/anatomy.svg", "docs/preview.png"
 PAL, SECTOR, PIX = 54, 512, 1078
 STATUS = (446, 462, 478, 494)
-data = open(BMP, "rb").read()
+data = Path(BMP).read_bytes()
 palette = Image.open(BMP).getpalette()
 
 
 # ------------------------------------------------------------------ the trace
 
+
 def one_instruction(off):
-    out = subprocess.run(["ndisasm", "-b16", "-o%d" % (0x7C00 + off), "-"],
-                         input=data[off:off + 16], capture_output=True, check=True).stdout
-    addr, hexbytes, text = out.decode().splitlines()[0].split(None, 2)
+    out = subprocess.run(
+        ["ndisasm", "-b16", f"-o{0x7C00 + off}", "-"], input=data[off : off + 16], capture_output=True, check=True
+    ).stdout
+    _addr, hexbytes, text = out.decode().splitlines()[0].split(None, 2)
     return len(hexbytes) // 2, " ".join(text.split())
 
 
@@ -51,9 +56,9 @@ def trace():
     for _ in range(200):
         n, text = one_instruction(off)
         path.append((off, n, text))
-        if data[off] == 0xEB:                             # jmp short
-            off += 2 + int.from_bytes(data[off + 1:off + 2], signed=True)
-        elif data[off] == 0xEA:                           # jmp far: offset, then segment
+        if data[off] == 0xEB:  # jmp short
+            off += 2 + int.from_bytes(data[off + 1 : off + 2], signed=True)
+        elif data[off] == 0xEA:  # jmp far: offset, then segment
             return path
         else:
             off += n
@@ -62,8 +67,7 @@ def trace():
 
 def far_target(path):
     off = path[-1][0]
-    return (int.from_bytes(data[off + 3:off + 5], "little"),
-            int.from_bytes(data[off + 1:off + 3], "little"))
+    return (int.from_bytes(data[off + 3 : off + 5], "little"), int.from_bytes(data[off + 1 : off + 3], "little"))
 
 
 # ------------------------------------------------------------------ type
@@ -72,11 +76,15 @@ def far_target(path):
 # so a few characters live at other code points.
 
 FONTS = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
-REMAP = {"–": ("cmr10", "{"), "—": ("cmr10", "|"),                  # ot1: 7B is en, 7C is em
-         "×": ("cmsy10", chr(0xA3)), "\u00a0": ("cmr10", " ")}
+REMAP = {
+    "–": ("cmr10", "{"),
+    "—": ("cmr10", "|"),  # ot1: 7B is en, 7C is em
+    "×": ("cmsy10", chr(0xA3)),
+    "\u00a0": ("cmr10", " "),
+}
 
 
-@lru_cache(maxsize=None)
+@cache
 def font(name):
     f = TTFont(os.path.join(FONTS, name + ".ttf"))
     return f, f.getBestCmap(), f.getGlyphSet(), f["head"].unitsPerEm
@@ -91,7 +99,7 @@ class Type:
             face, ch = REMAP[ch]
         f, cmap, glyphs, upm = font(face)
         name = cmap[ord(ch)]
-        gid = "%s-%s" % (face, name)
+        gid = f"{face}-{name}"
         if gid not in self.defs:
             pen = SVGPathPen(glyphs)
             glyphs[name].draw(pen)
@@ -109,10 +117,12 @@ class Type:
             gid, adv, upm = self.glyph(face, c)
             k = size / upm
             if c not in " \u00a0":
-                out.append('<use href="#%s" xlink:href="#%s" transform="translate(%.2f %.2f) scale(%.5f -%.5f)"/>'
-                           % (gid, gid, x, y, k, k))
+                out.append(
+                    f'<use href="#{gid}" xlink:href="#{gid}" '
+                    f'transform="translate({x:.2f} {y:.2f}) scale({k:.5f} -{k:.5f})"/>'
+                )
             x += adv * k
-        return '<g fill="%s">%s</g>' % (fill, "".join(out))
+        return f'<g fill="{fill}">{"".join(out)}</g>'
 
     def runs(self, x, y, runs, size=10, fill="#000"):
         """a line of mixed faces: [(text, face), ...]."""
@@ -146,7 +156,7 @@ class Type:
             line.append((word, face))
             w += ww
         lines.append(line)
-        return "".join(self.runs(x, y + i * leading, l, size) for i, l in enumerate(lines)), len(lines)
+        return "".join(self.runs(x, y + i * leading, ln, size) for i, ln in enumerate(lines)), len(lines)
 
 
 # ------------------------------------------------------------------ the listing
@@ -155,11 +165,12 @@ class Type:
 # the way the source does. the trace still comes from the file: the names are
 # checked against it, instruction for instruction, by ndisasm's mnemonic.
 
+
 def listing(path):
     """the rows of panel (c): dicts of run, instructions (indices into path), label,
     name, note, and whether they are fillers."""
     asm, label = [], None
-    for line in open("stub.asm"):
+    for line in Path("stub.asm").read_text().splitlines(keepends=True):
         if line.startswith("read:"):
             label = "read:"
             continue
@@ -168,13 +179,12 @@ def listing(path):
         ins, _, note = (s.strip() for s in line.partition(";"))
         asm.append((ins, note, label))
         label = None
-    head = [("inc dx", "the B", None), ("dec bp", "the M", None),
-            ("jmp short", "bfSize: into the palette", None)]
+    head = [("inc dx", "the B", None), ("dec bp", "the M", None), ("jmp short", "bfSize: into the palette", None)]
     named = head + asm
     assert len(named) == len(path), "stub.asm and the trace disagree"
 
     rows, run = [], 0
-    for i, ((off, n, text), (ins, note, label)) in enumerate(zip(path, named)):
+    for i, ((off, _n, text), (ins, note, label)) in enumerate(zip(path, named, strict=False)):
         assert ins.split()[0] == text.split()[0], (ins, text)
         if ins.startswith("jmp short"):
             ins, note = "jmp short", note.replace("hop over", "over")
@@ -185,8 +195,16 @@ def listing(path):
             rows[-1]["ins"].append(i)
             rows[-1]["name"] += "; " + ins
         else:
-            rows.append(dict(run=run, ins=[i], label=None, name=ins, filler=filler,
-                             note="fillers, for their colour" if filler else note))
+            rows.append(
+                dict(
+                    run=run,
+                    ins=[i],
+                    label=None,
+                    name=ins,
+                    filler=filler,
+                    note="fillers, for their colour" if filler else note,
+                )
+            )
         if data[off] in (0xEB, 0xEA):
             run += 1
     return rows
@@ -195,15 +213,15 @@ def listing(path):
 # ------------------------------------------------------------------ figure 1
 
 INK, GREY, RULE = "#000", "#555", 0.6
-COLS, EW, EH = 16, 30, 20                 # palette entries per row, swatch width and height
-BW = EW / 4                               # one byte of the palette
-HBW = 2 * BW                              # one byte of the file header, drawn wider
-X0, GW = 78, COLS * EW                    # left edge and width of panels (a) and (b)
-Y_HEAD, HH = 62, 24                       # top and height of the header strip
-Y_GRID = Y_HEAD + HH + 84                 # top of the palette
-LAST = (SECTOR - 1 - PAL) // 4            # 0x72: the last entry the boot sector reaches
+COLS, EW, EH = 16, 30, 20  # palette entries per row, swatch width and height
+BW = EW / 4  # one byte of the palette
+HBW = 2 * BW  # one byte of the file header, drawn wider
+X0, GW = 78, COLS * EW  # left edge and width of panels (a) and (b)
+Y_HEAD, HH = 62, 24  # top and height of the header strip
+Y_GRID = Y_HEAD + HH + 84  # top of the palette
+LAST = (SECTOR - 1 - PAL) // 4  # 0x72: the last entry the boot sector reaches
 ROWS = LAST // COLS + 1
-LEAD = 13.5                               # listing line spacing
+LEAD = 13.5  # listing line spacing
 
 
 def hx(off):
@@ -236,7 +254,8 @@ def byte_boxes(off, n):
 
 
 def rgb(e):
-    return "#%02x%02x%02x" % tuple(palette[3 * e:3 * e + 3])
+    r, g, b = palette[3 * e : 3 * e + 3]
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 def arrowhead(x, y, dx, dy, size=4.5):
@@ -244,9 +263,13 @@ def arrowhead(x, y, dx, dy, size=4.5):
     n = (dx * dx + dy * dy) ** 0.5 or 1
     ux, uy = dx / n, dy / n
     px, py = -uy, ux
-    pts = [(x, y), (x - ux * size + px * size * 0.42, y - uy * size + py * size * 0.42),
-           (x - ux * size - px * size * 0.42, y - uy * size - py * size * 0.42)]
-    return '<path d="M%.2f %.2fL%.2f %.2fL%.2f %.2fZ" fill="%s"/>' % (*pts[0], *pts[1], *pts[2], INK)
+    pts = [
+        (x, y),
+        (x - ux * size + px * size * 0.42, y - uy * size + py * size * 0.42),
+        (x - ux * size - px * size * 0.42, y - uy * size - py * size * 0.42),
+    ]
+    (x1, y1), (x2, y2), (x3, y3) = pts
+    return f'<path d="M{x1:.2f} {y1:.2f}L{x2:.2f} {y2:.2f}L{x3:.2f} {y3:.2f}Z" fill="{INK}"/>'
 
 
 def esc(s):
@@ -256,11 +279,15 @@ def esc(s):
 # the figure is live where it is inlined (the project page): pointing at a line of
 # (c), or at a byte of the path, lights up the other. css only, no script; in an
 # <img>, as on github, none of it fires and the figure is simply static.
-STYLE = (".hit rect{fill:#fff;fill-opacity:0}.row{outline:none}.row>rect{fill:#ffe7a0;fill-opacity:0}"
-         ".row,.hit{cursor:default}")
-LIT = ("svg:has(.r{k}:hover,.r{k}:focus,.h{k}:hover) .h{k} rect"
-       "{{fill-opacity:.5;stroke:#000;stroke-width:2}}"
-       "svg:has(.r{k}:hover,.r{k}:focus,.h{k}:hover) .r{k}>rect{{fill-opacity:1}}")
+STYLE = (
+    ".hit rect{fill:#fff;fill-opacity:0}.row{outline:none}.row>rect{fill:#ffe7a0;fill-opacity:0}"
+    ".row,.hit{cursor:default}"
+)
+LIT = (
+    "svg:has(.r{k}:hover,.r{k}:focus,.h{k}:hover) .h{k} rect"
+    "{{fill-opacity:.5;stroke:#000;stroke-width:2}}"
+    "svg:has(.r{k}:hover,.r{k}:focus,.h{k}:hover) .r{k}>rect{{fill-opacity:1}}"
+)
 
 
 def anatomy():
@@ -269,24 +296,44 @@ def anatomy():
     rows = listing(path)
     pixels = Image.open(BMP).histogram()
     o, hits = [], []
-    line = lambda x1, y1, x2, y2, w=RULE, c=INK: o.append(
-        '<path d="M%.2f %.2fL%.2f %.2f" stroke="%s" stroke-width="%s" fill="none"/>' % (x1, y1, x2, y2, c, w))
-    box = lambda x, y, w, h, sw=RULE: o.append(
-        '<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="none" stroke="%s" stroke-width="%s"/>'
-        % (x, y, w, h, INK, sw))
+
+    def line(x1, y1, x2, y2, w=RULE, c=INK):
+        return o.append(f'<path d="M{x1:.2f} {y1:.2f}L{x2:.2f} {y2:.2f}" stroke="{c}" stroke-width="{w}" fill="none"/>')
+
+    def box(x, y, w, h, sw=RULE):
+        return o.append(
+            f'<rect x="{x:.2f}" y="{y:.2f}" width="{w:.2f}" height="{h:.2f}" fill="none" '
+            f'stroke="{INK}" stroke-width="{sw}"/>'
+        )
 
     # --- (a) the header
     o.append(t.runs(X0, Y_HEAD - 32, [("(a)", "cmb10"), ("  Headers, bytes 0–53", "cmr10")], 11.5))
     executed = {b for off, n, _ in path for b in range(off, off + n)}
     for off in range(14):
-        o.append('<rect x="%.2f" y="%d" width="%.2f" height="%d" fill="#fff" stroke="#999" stroke-width="0.35"/>'
-                 % (hx(off), Y_HEAD, HBW, HH))
+        o.append(
+            f'<rect x="{hx(off):.2f}" y="{Y_HEAD}" width="{HBW:.2f}" height="{HH}" fill="#fff" '
+            'stroke="#999" stroke-width="0.35"/>'
+        )
         if off in executed:
-            o.append(t.text(hx(off) + HBW / 2, Y_HEAD + 9.4, "%02X" % data[off], "cmtt10", 7.6, "middle"))
-    o.append(t.text((hx(14) + hx(54)) / 2, Y_HEAD + HH / 2 + 3.2,
-                    "320 × 200, top-down, 8 bits per pixel, 256 colours", "cmr10", 9, "middle", GREY))
-    for a, b, label in [(0, 2, "bfType"), (2, 6, "bfSize"), (6, 10, "reserved"), (10, 14, "bfOffBits"),
-                        (14, 54, "BITMAPINFOHEADER")]:
+            o.append(t.text(hx(off) + HBW / 2, Y_HEAD + 9.4, f"{data[off]:02X}", "cmtt10", 7.6, "middle"))
+    o.append(
+        t.text(
+            (hx(14) + hx(54)) / 2,
+            Y_HEAD + HH / 2 + 3.2,
+            "320 × 200, top-down, 8 bits per pixel, 256 colours",
+            "cmr10",
+            9,
+            "middle",
+            GREY,
+        )
+    )
+    for a, b, label in [
+        (0, 2, "bfType"),
+        (2, 6, "bfSize"),
+        (6, 10, "reserved"),
+        (10, 14, "bfOffBits"),
+        (14, 54, "BITMAPINFOHEADER"),
+    ]:
         box(hx(a), Y_HEAD, hx(b) - hx(a), HH)
         face = "cmr10" if label == "reserved" else "cmtt10"
         o.append(t.text((hx(a) + hx(b)) / 2, Y_HEAD - 6, label, face, 8.8, "middle", GREY))
@@ -297,26 +344,29 @@ def anatomy():
     # --- (b) the palette, up to the end of the boot sector
     o.append(t.runs(X0, Y_GRID - 34, [("(b)", "cmb10"), ("  Palette, bytes 54–511", "cmr10")], 11.5))
     for c in range(COLS):
-        o.append(t.text(X0 + c * EW + EW / 2, Y_GRID - 7, "%X" % c, "cmtt10", 9, "middle", GREY))
+        o.append(t.text(X0 + c * EW + EW / 2, Y_GRID - 7, f"{c:X}", "cmtt10", 9, "middle", GREY))
     o.append(t.text(X0 - 50, Y_GRID - 7, "entry", "cmr10", 9, "middle", GREY))
     o.append(t.text(X0 - 8, Y_GRID - 7, "byte", "cmr10", 9, "end", GREY))
     for r in range(ROWS):
         y = Y_GRID + r * EH
-        o.append(t.text(X0 - 50, y + EH / 2 + 3, "%X0" % r, "cmtt10", 9, "middle", GREY))
+        o.append(t.text(X0 - 50, y + EH / 2 + 3, f"{r:X}0", "cmtt10", 9, "middle", GREY))
         o.append(t.text(X0 - 8, y + EH / 2 + 3, str(PAL + 4 * COLS * r), "cmr10", 9, "end", GREY))
     for e in range(LAST + 1):
         r, c = divmod(e, COLS)
-        o.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s" stroke="#fff" stroke-width="0.8">'
-                 '<title>entry %02X, %s, %s pixels</title></rect>'
-                 % (X0 + c * EW, Y_GRID + r * EH, EW, EH, rgb(e), e, rgb(e), f"{pixels[e]:,}"))
+        o.append(
+            f'<rect x="{X0 + c * EW}" y="{Y_GRID + r * EH}" width="{EW}" height="{EH}" fill="{rgb(e)}" '
+            f'stroke="#fff" stroke-width="0.8"><title>entry {e:02X}, {rgb(e)}, {pixels[e]:,} pixels'
+            "</title></rect>"
+        )
     # entry 72 straddles byte 512: its red and unused bytes are beyond the sector
-    x512, y512 = byte_xy(SECTOR)
+    x512, _y512 = byte_xy(SECTOR)
     x512 -= BW / 2
     yr = Y_GRID + (ROWS - 1) * EH
-    o.append('<rect x="%.2f" y="%d" width="%.2f" height="%d" fill="#fff" fill-opacity="0.7"/>'
-             % (x512, yr, 2 * BW, EH))
-    o.append('<path d="M%d %dH%dV%dH%.2fV%dH%dZ" fill="none" stroke="%s" stroke-width="%s"/>'
-             % (X0, Y_GRID, X0 + GW, yr, x512, yr + EH, X0, INK, RULE))
+    o.append(f'<rect x="{x512:.2f}" y="{yr}" width="{2 * BW:.2f}" height="{EH}" fill="#fff" fill-opacity="0.7"/>')
+    o.append(
+        f'<path d="M{X0} {Y_GRID}H{X0 + GW}V{yr}H{x512:.2f}V{yr + EH}H{X0}Z" fill="none" stroke="{INK}" '
+        f'stroke-width="{RULE}"/>'
+    )
     line(x512, yr - 4, x512, yr + EH + 4, 1.1)
     o.append(t.text(x512, yr + EH + 15, "byte 512: end of the boot sector", "cmr10", 9, "middle", GREY))
     for off in STATUS:
@@ -328,43 +378,43 @@ def anatomy():
     # --- the path the cpu takes
     pts = [(b, byte_xy(b)) for off, n, _ in path for b in range(off, off + n)]
     d, heads, markers = "", [], []
-    starts = {path[0][0]} | {off for i, (off, n, _) in enumerate(path) if i and data[path[i - 1][0]] in (0xEB, 0xEA)}
+    {path[0][0]} | {off for i, (off, n, _) in enumerate(path) if i and data[path[i - 1][0]] in (0xEB, 0xEA)}
     for i, (b, (x, y)) in enumerate(pts):
         if i == 0:
-            d += "M%.2f %.2f" % (x, y)
+            d += f"M{x:.2f} {y:.2f}"
             markers.append((X0 - 12, y))
             continue
         pb, (px, py) = pts[i - 1]
         if b == pb + 1 and abs(y - py) < 1:
-            d += " L%.2f %.2f" % (x, y)
-        elif b == pb + 1:                                  # wrapping to the next row
-            d += " C%.2f %.2f %.2f %.2f %.2f %.2f" % (px + 14, py, x - 14, y, x, y)
-        elif pb < 14:                                      # out of the header: land vertically,
-            ye = Y_GRID - 16                               # dropping between two column labels
+            d += f" L{x:.2f} {y:.2f}"
+        elif b == pb + 1:  # wrapping to the next row
+            d += f" C{px + 14:.2f} {py:.2f} {x - 14:.2f} {y:.2f} {x:.2f} {y:.2f}"
+        elif pb < 14:  # out of the header: land vertically,
+            ye = Y_GRID - 16  # dropping between two column labels
             k = (ye - py) * 0.55
-            d += " C%.2f %.2f %.2f %.2f %.2f %.2f L%.2f %.2f" % (px, py + k, x, ye - k, x, ye, x, y - 3)
+            d += f" C{px:.2f} {py + k:.2f} {x:.2f} {ye - k:.2f} {x:.2f} {ye:.2f} L{x:.2f} {y - 3:.2f}"
             heads.append((x, y - 3, 0, 1))
             markers.append((x - 11, y))
-        else:                                              # a hop within the palette
+        else:  # a hop within the palette
             k = max(36, abs(x - px) * 0.32)
-            d += " C%.2f %.2f %.2f %.2f %.2f %.2f" % (px + k, py, x - k, y, x, y)
+            d += f" C{px + k:.2f} {py:.2f} {x - k:.2f} {y:.2f} {x:.2f} {y:.2f}"
             heads.append((x - 2.2, y, 1, 0))
             markers.append((x, y - EH / 2))
-    o.append('<path d="%s" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>' % d)
-    o.append('<path d="%s" fill="none" stroke="%s" stroke-width="0.9" stroke-linejoin="round"/>' % (d, INK))
-    for off, n, _ in path:
+    o.append(f'<path d="{d}" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>')
+    o.append(f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="0.9" stroke-linejoin="round"/>')
+    for off, _, _ in path:
         x, y = byte_xy(off)
-        o.append('<circle cx="%.2f" cy="%.2f" r="1.7" fill="#fff" stroke="%s" stroke-width="0.6"/>' % (x, y, INK))
+        o.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="1.7" fill="#fff" stroke="{INK}" stroke-width="0.6"/>')
     for h in heads:
         o.append(arrowhead(*h))
     ex, ey = pts[-1][1]
     xr = X0 + GW
-    o.append('<path d="M%.2f %.2fL%.2f %.2f" stroke="#fff" stroke-width="3.2"/>' % (ex + 3, ey, xr + 18, ey))
+    o.append(f'<path d="M{ex + 3:.2f} {ey:.2f}L{xr + 18:.2f} {ey:.2f}" stroke="#fff" stroke-width="3.2"/>')
     line(ex + 3, ey, xr + 18, ey, 0.9)
     o.append(arrowhead(xr + 22, ey, 1, 0))
 
     def marker(x, y, n):
-        o.append('<circle cx="%.2f" cy="%.2f" r="5.6" fill="#fff" stroke="%s" stroke-width="0.7"/>' % (x, y, INK))
+        o.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5.6" fill="#fff" stroke="{INK}" stroke-width="0.7"/>')
         o.append(t.text(x, y + 2.7, str(n), "cmr10", 8, "middle"))
 
     for n, (x, y) in enumerate(markers, 1):
@@ -379,8 +429,8 @@ def anatomy():
         o.append(t.runs(ax, y, runs, size, GREY))
 
     seg, offs = far_target(path)
-    note(ey - 3, [("jmp %04X:%04X" % (seg, offs), "cmtt10")])
-    note(ey + 9, [("into the pixels: row 0, x = %d" % ((offs - 0x8000 - PIX) % 320), "cmr10")])
+    note(ey - 3, [(f"jmp {seg:04X}:{offs:04X}", "cmtt10")])
+    note(ey + 9, [(f"into the pixels: row 0, x = {(offs - 0x8000 - PIX) % 320}", "cmr10")])
     x, y = byte_xy(STATUS[-1])
     line(x + BW / 2, y, ax - 4, y, 0.4, GREY)
     note(y - 8, [("partition status bytes,", "cmr10")])
@@ -395,8 +445,7 @@ def anatomy():
     o.append(t.runs(X0, yc, [("(c)", "cmb10"), ("  The path, disassembled", "cmr10")], 11.5))
     size = 8.8
     for row in rows:
-        row["hex"] = " ".join("%02X" % data[b] for i in row["ins"]
-                              for b in range(path[i][0], path[i][0] + path[i][1]))
+        row["hex"] = " ".join(f"{data[b]:02X}" for i in row["ins"] for b in range(path[i][0], path[i][0] + path[i][1]))
     # two columns, split between runs, each as wide as its own widest cells
     half = min(range(1, len(rows)), key=lambda j: abs(2 * j - len(rows)) + 99 * (rows[j]["run"] == rows[j - 1]["run"]))
     cols = []
@@ -418,17 +467,23 @@ def anatomy():
         if row["label"]:
             o.append(t.text(cx + 18 + bw, y, row["label"], "cmtt10", size, fill=GREY))
             continue
-        cells = (t.text(cx + 18, y, row["hex"], "cmtt10", size, fill=ink)
-                 + t.text(cx + 18 + bw, y, row["name"], "cmtt10", size, fill=ink)
-                 + t.text(cx + 18 + bw + iw, y, row["note"], "cmr10", size, fill=GREY))
-        o.append('<g class="row r%d" tabindex="0"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>%s</g>'
-                 % (j, cx + 14, y - 9.6, colw - 12, LEAD, cells))
-        rects = "".join('<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>' % tuple(bx)
-                        for i in row["ins"] for bx in byte_boxes(*path[i][:2]))
+        cells = (
+            t.text(cx + 18, y, row["hex"], "cmtt10", size, fill=ink)
+            + t.text(cx + 18 + bw, y, row["name"], "cmtt10", size, fill=ink)
+            + t.text(cx + 18 + bw + iw, y, row["note"], "cmr10", size, fill=GREY)
+        )
+        o.append(
+            f'<g class="row r{j}" tabindex="0"><rect x="{cx + 14:.2f}" y="{y - 9.6:.2f}" '
+            f'width="{colw - 12:.2f}" height="{LEAD:.2f}"/>{cells}</g>'
+        )
+        rects = "".join(
+            f'<rect x="{x:.2f}" y="{y:.2f}" width="{w:.2f}" height="{h:.2f}"/>'
+            for i in row["ins"]
+            for x, y, w, h in byte_boxes(*path[i][:2])
+        )
         first_b = path[row["ins"][0]][0]
         last_b = path[row["ins"][-1]][0] + path[row["ins"][-1]][1] - 1
-        hits.append('<g class="hit h%d">%s<title>%s, bytes %d–%d</title></g>'
-                    % (j, rects, esc(row["name"]), first_b, last_b))
+        hits.append(f'<g class="hit h{j}">{rects}<title>{esc(row["name"])}, bytes {first_b}–{last_b}</title></g>')
         style.append(LIT.format(k=j))
     o.extend(hits)
     ylist = yc + 22 + (max(half, len(rows) - half) - 1) * LEAD
@@ -440,36 +495,56 @@ def anatomy():
     code = sum(n for off, n, _ in path if off >= PAL)
     touched = len({(b - PAL) // 4 for b, _ in pts if b >= PAL})
     ycap = ylist + 36
-    cap, n = t.wrap(16, ycap, W - 32, [
-        ("Figure 1.", "cmb10"),
-        (" The first 512 bytes of ", "cmr10"), ("fixpoint.bmp", "cmtt10"),
-        (". (a) The headers. The CPU starts at byte 0: ", "cmr10"), ("BM", "cmtt10"),
-        (" executes as ", "cmr10"), ("inc dx; dec bp", "cmtt10"), (", and the low bytes of ", "cmr10"),
-        ("bfSize", "cmtt10"), (", ", "cmr10"), ("EB %02X" % data[3], "cmtt10"),
-        (", are a short jump into the palette. (b) The palette up to byte 512, one swatch per entry, "
-         "drawn in its own colour. The line is the path the CPU takes, traced by disassembling the "
-         "file from byte 0 and following each jump: %d instructions, %d bytes of code in %d palette "
-         "entries, and %d short jumps over entries the bootloader leaves alone. Outlined: the four "
-         "partition status bytes and the boot signature, which the disk format fixes and the palette "
-         "absorbs. (c) The same path as instructions, named as in "
-         % (len(path), code, touched, len(jumps) - 1), "cmr10"),
-        ("stub.asm", "cmtt10"),
-        ("; the fillers, in grey, are there only for their colour.", "cmr10"),
-    ], size=10.6, leading=14.5)
+    cap, n = t.wrap(
+        16,
+        ycap,
+        W - 32,
+        [
+            ("Figure 1.", "cmb10"),
+            (" The first 512 bytes of ", "cmr10"),
+            ("fixpoint.bmp", "cmtt10"),
+            (". (a) The headers. The CPU starts at byte 0: ", "cmr10"),
+            ("BM", "cmtt10"),
+            (" executes as ", "cmr10"),
+            ("inc dx; dec bp", "cmtt10"),
+            (", and the low bytes of ", "cmr10"),
+            ("bfSize", "cmtt10"),
+            (", ", "cmr10"),
+            (f"EB {data[3]:02X}", "cmtt10"),
+            (
+                ", are a short jump into the palette. (b) The palette up to byte 512, one swatch per entry, "
+                "drawn in its own colour. The line is the path the CPU takes, traced by disassembling the "
+                f"file from byte 0 and following each jump: {len(path)} instructions, {code} bytes of code in "
+                f"{touched} palette entries, and {len(jumps) - 1} short jumps over entries the bootloader leaves "
+                "alone. Outlined: the four partition status bytes and the boot signature, which the disk format "
+                "fixes and the palette absorbs. (c) The same path as instructions, named as in ",
+                "cmr10",
+            ),
+            ("stub.asm", "cmtt10"),
+            ("; the fillers, in grey, are there only for their colour.", "cmr10"),
+        ],
+        size=10.6,
+        leading=14.5,
+    )
     o.append(cap)
     H = ycap + n * 14.5 + 6
 
-    defs = "".join('<path id="%s" d="%s"/>' % (gid, d) for gid, d in sorted(t.defs.items()))
-    svg = ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
-           'viewBox="0 0 %d %d" width="%d" height="%d">\n'
-           '<title>Figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, '
-           'with the path the cpu takes through them and its instructions</title>\n'
-           '<style>%s</style>\n'
-           '<rect width="100%%" height="100%%" fill="#fff"/>\n<defs>%s</defs>\n%s\n</svg>\n'
-           % (W, H, W * 1.25, H * 1.25, "".join(style), defs, "\n".join(o)))
-    open(OUT, "w").write(svg)
-    print(f"{OUT}: {len(path)} instructions traced, {code} bytes of code in {touched} palette entries, "
-          f"{len(jumps) - 1} hops")
+    defs = "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in sorted(t.defs.items()))
+    body = "\n".join(o)
+    # %d truncated these before; int() keeps the svg byte for byte the same
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+        f'viewBox="0 0 {int(W)} {int(H)}" width="{int(W * 1.25)}" height="{int(H * 1.25)}">\n'
+        "<title>Figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, "
+        "with the path the cpu takes through them and its instructions</title>\n"
+        f"<style>{''.join(style)}</style>\n"
+        f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n{body}\n</svg>\n'
+    )
+    Path(OUT).write_text(svg)
+    print(
+        f"{OUT}: {len(path)} instructions traced, {code} bytes of code in {touched} palette entries, "
+        f"{len(jumps) - 1} hops"
+    )
 
 
 def preview():

@@ -16,7 +16,10 @@
 # never cds for the caller: start prints the path, and you go there yourself.
 set -eu
 
-die() { echo "agent: $*" >&2; exit 1; }
+die() {
+	echo "agent: $*" >&2
+	exit 1
+}
 say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
 
 git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git repository"
@@ -40,21 +43,33 @@ pr_state() { gh pr view "$1" --json state -q .state 2>/dev/null; }
 
 doctor() {
 	bad=0
-	ok() { echo "  ok    $*"; }
-	no() { echo "  FAIL  $*"; bad=1; }
-	git remote get-url origin >/dev/null 2>&1 && ok "remote origin: $(git remote get-url origin)" || no "no remote named origin"
-	ok "default branch: $default"
-	[ "$(git config core.hooksPath)" = .githooks ] && ok "hooks: .githooks" || no "hooks not wired: scripts/setup"
-	gh auth status >/dev/null 2>&1 && ok "gh: authenticated" || no "gh: not authenticated: gh auth login"
-	for tool in nasm ndisasm qemu-system-i386 node npm make; do
-		command -v "$tool" >/dev/null 2>&1 && ok "$tool" || no "$tool missing: scripts/setup"
+	# probe <ok message> <fail message> <command...>
+	probe() {
+		pass=$1 fail=$2
+		shift 2
+		if "$@" >/dev/null 2>&1; then
+			echo "  ok    $pass"
+		else
+			echo "  FAIL  $fail"
+			bad=1
+		fi
+	}
+	probe "remote origin: $(git remote get-url origin 2>/dev/null)" "no remote named origin" git remote get-url origin
+	echo "  ok    default branch: $default"
+	probe "hooks: .githooks" "hooks not wired: scripts/setup" test "$(git config core.hooksPath)" = .githooks
+	probe "gh: authenticated" "gh: not authenticated: gh auth login" gh auth status
+	for tool in nasm ndisasm qemu-system-i386 node npm make shellcheck shfmt; do
+		probe "$tool" "$tool missing: scripts/setup" command -v "$tool"
 	done
-	py=$(git rev-parse --show-toplevel)/.venv/bin/python
-	[ -x "$py" ] || py=$main_root/.venv/bin/python
-	[ -x "$py" ] || py=python3
-	"$py" -c "import numpy, PIL, matplotlib, fontTools" 2>/dev/null && ok "python requirements ($py)" ||
-		no "python requirements missing: scripts/setup"
-	[ -z "$(git status --porcelain)" ] && ok "tree clean" || echo "  --    tree has changes (fine mid-task)"
+	venv=$(git rev-parse --show-toplevel)/.venv
+	[ -x "$venv/bin/python" ] || venv=$main_root/.venv
+	probe "python requirements and ruff ($venv)" "python environment incomplete: scripts/setup" \
+		"$venv/bin/python" -c "import numpy, PIL, matplotlib, fontTools; import shutil; assert shutil.which('ruff', path='$venv/bin')"
+	if [ -z "$(git status --porcelain)" ]; then
+		echo "  ok    tree clean"
+	else
+		echo "  --    tree has changes (fine mid-task)"
+	fi
 	[ "$bad" = 0 ] || exit 1
 }
 

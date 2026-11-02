@@ -52,6 +52,7 @@
 	<meta name="twitter:description" content={description} />
 	<meta name="twitter:image" content={poster.url} />
 
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- built here from constants, < escaped -->
 	{@html jsonld}
 </svelte:head>
 
@@ -68,10 +69,11 @@
 	</header>
 
 	<p class="lead">
-		<a href={asset('/fixpoint.bmp')} class="tt">fixpoint.bmp</a> is an ordinary 320&times;200 bitmap: open it in anything and it&rsquo;s an image. write it to a disk and boot it, and
-		the cpu draws the same image again, byte for byte, without looking. unzip it and it hands you its own source. the
-		picture is rule 110 running through its ether, disturbed by 130 bytes of code hiding in the top row, and what
-		you&rsquo;re looking at is that code&rsquo;s light cone: everywhere its influence has reached so far.
+		<a href={asset('/fixpoint.bmp')} class="tt">fixpoint.bmp</a> is an ordinary 320&times;200 bitmap: open it in anything
+		and it&rsquo;s an image. write it to a disk and boot it, and the cpu draws the same image again, byte for byte, without
+		looking. unzip it and it hands you its own source. the picture is rule 110 running through its ether, disturbed by 130
+		bytes of code hiding in the top row, and what you&rsquo;re looking at is that code&rsquo;s light cone: everywhere its
+		influence has reached so far.
 	</p>
 	<p class="aside">here it is, booting:</p>
 
@@ -95,20 +97,30 @@
 	</figure>
 
 	<p class="aside">if you want to try it:</p>
-	<pre class="commands">{#each commands as line, i (i)}<span class="prompt" aria-hidden="true">$ </span>{line}{'\n'}{/each}</pre>
+	<pre class="commands">{#each commands as line, i (i)}<span class="prompt" aria-hidden="true"
+				>$ </span>{line}{'\n'}{/each}</pre>
 
 	<article class="body">
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -- site/src/post.md, rendered at build time -->
 		{@html data.html}
 
 		<h2 id="the-files">the files</h2>
 		<table class="listing">
 			<thead>
-				<tr><th scope="col">name</th><th scope="col">last modified</th><th scope="col" class="r">size</th><th scope="col">what it is</th></tr>
+				<tr
+					><th scope="col">name</th><th scope="col">last modified</th><th scope="col" class="r">size</th><th scope="col"
+						>what it is</th
+					></tr
+				>
 			</thead>
 			<tbody>
 				{#each data.files as f (f.name)}
 					<tr>
-						<td class="tt"><a href={f.href.startsWith('http') ? f.href : asset('/' + f.href)}>{f.name}</a></td>
+						<td class="tt">
+							{#if f.served}<a href={asset(`/${f.served}`)}>{f.name}</a>{:else}<a
+									href="https://github.com/oddurs/fixpoint/blob/main/{f.path}">{f.name}</a
+								>{/if}
+						</td>
 						<td class="tt"><time datetime={f.date}>{f.date}</time></td>
 						<td class="tt r">{f.size}</td>
 						<td>{f.what}</td>

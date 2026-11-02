@@ -21,18 +21,19 @@ jobs:
           fetch-depth: 0 # the site's file listing dates each file from git
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
+          cache-dependency-path: requirements*.txt
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
-      - name: install nasm, qemu, ffmpeg, and the python requirements
+      - name: install nasm, qemu, ffmpeg, shellcheck, shfmt, and the python requirements
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm qemu-system-x86 ffmpeg
-          pip install -r requirements.txt
+          sudo apt-get install -y nasm qemu-system-x86 ffmpeg shellcheck shfmt
+          pip install -r requirements-dev.txt
       - run: ./scripts/task check
 
   # the one status check branch protection names, so adding jobs never means editing it

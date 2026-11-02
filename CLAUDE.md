@@ -8,6 +8,9 @@ with rule 110. The project page is https://fixpoint.oddurs.com.
 - `scripts/setup` once per clone: hooks, a uv `.venv`, toolchain check.
 - `scripts/task check` is the whole gate: lint, then rebuild everything and require the
   committed artifacts byte-identical, then `verify.py` (boots qemu), then the site.
+- `scripts/task fmt` formats everything: ruff (python), shfmt (shell), prettier (site).
+  `scripts/task lint` runs ruff, shellcheck and eslint. Fix findings; don't disable rules
+  without a comment saying why, as in `site/eslint.config.js`.
 - `scripts/task test` alone skips the site build; `make run` boots it in a qemu window.
 - Site dev server: `cd site && npm run dev`.
 
