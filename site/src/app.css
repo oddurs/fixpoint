@@ -348,10 +348,6 @@ td:first-child {
 .r {
 	text-align: right;
 }
-.listing td:nth-child(2),
-.listing td:nth-child(3) {
-	white-space: nowrap;
-}
 
 /* --- the footer */
 
@@ -379,9 +375,5 @@ footer p {
 	.body table {
 		display: block;
 		overflow-x: auto;
-	}
-	/* a phone has no room for the dates; the name, size and gloss are the listing */
-	.listing :is(th, td):nth-child(2) {
-		display: none;
 	}
 }

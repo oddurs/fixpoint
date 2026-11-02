@@ -115,6 +115,41 @@ def rule110(row0):
     return t
 
 
+def cone_edges(reached, p0, p1, gens=100):
+    """how far past the program's ends the influence has travelled, generation by generation,
+    along the tape. past about generation 100 the cone overlaps itself and edges blur."""
+    right, left = np.zeros(gens, int), np.zeros(gens, int)
+    for g in range(1, gens):
+        base = W * g
+        for side, start, step in ((right, p1, 1), (left, p0, -1)):
+            gap, d = 0, 0
+            while gap < 40 and 0 <= base + start + step * (d + 1) < W * H:
+                d += 1
+                if reached[base + start + step * d]:
+                    side[g], gap = d, 0
+                else:
+                    gap += 1
+    return right, left
+
+
+def out_of_step(calm, x):
+    """reached-but-dark cells connected to the program's last 14 cells (8-way, on the screen)."""
+    calm = calm.reshape(H, W)
+    seen = np.zeros_like(calm)
+    todo = [(0, c) for c in range(x, W) if calm[0, c]]
+    for cell in todo:
+        seen[cell] = True
+    while todo:
+        y, c = todo.pop()
+        for dy in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                yy, cc = y + dy, c + dc
+                if 0 <= yy < H and 0 <= cc < W and calm[yy, cc] and not seen[yy, cc]:
+                    seen[yy, cc] = True
+                    todo.append((yy, cc))
+    return seen.reshape(-1)
+
+
 def chrome_decode(path, tmp):
     exe = next((c for c in CHROME if shutil.which(c)), None)
     if not exe:
@@ -197,7 +232,31 @@ def main():
     check("every cell the program hasn't reached is dark", not (~reached & ~agree).any(), f"{(~reached).sum()} cells")
     print(
         f"        the program reaches {reached.sum()} cells ({reached.mean():.1%}); "
-        f"{(reached & agree).sum()} of them are dark by coincidence ({(reached & agree).sum() / reached.sum():.2%})"
+        f"{(reached & agree).sum()} of them look dark anyway ({(reached & agree).sum() / reached.sum():.2%})"
+    )
+
+    print("as a picture, the page's details")
+    colours = len(np.unique(pixels))
+    check("every one of the 256 colours appears", colours == 256, f"{colours} colours")
+    signature = int((pixels == 0x72).sum())
+    check("the boot signature's colour, entry 72, appears 107 times", signature == 107, f"{signature} pixels")
+    tail = row0[W - 14 :]
+    check(
+        "the program ends with one period of the ether, 12 cells out of phase",
+        (tail == row0[:14]).all() and (W - 14) % 14 == 12,
+    )
+    corner = out_of_step(reached & agree, W - 14)
+    depth = int(np.nonzero(corner.reshape(H, W).any(axis=1))[0].max()) + 1
+    check("under it, a triangle of out-of-step ether 13 rows deep", depth == 13, f"{corner.sum()} cells")
+    calm = int((reached & agree & ~corner).sum())
+    check("306 reached cells elsewhere happen to look untouched", calm == 306, f"{calm} cells")
+    right, left = cone_edges(reached, x0, W - 1)
+    gens = np.arange(30, 100)
+    vr, vl = np.polyfit(gens, right[30:100], 1)[0], np.polyfit(gens, left[30:100], 1)[0]
+    check(
+        "the cone's right edge stalls for 30 rows, then spreads at about 0.62 a row, the left at about 0.48",
+        right[30] <= 6 and abs(vr - 0.62) < 0.03 and abs(vl - 0.48) < 0.03,
+        f"right edge +{right[30]} at row 30; {vr:.3f} right, {vl:.3f} left over rows 30-100",
     )
 
     print("as an archive")

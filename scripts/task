@@ -64,7 +64,7 @@ test_() {
 	say "test: rebuild from source"
 	make -s -B PYTHON="$PYTHON" all
 	say "test: the committed image, stub and figure are exactly what the source builds"
-	git diff --exit-code --stat -- fixpoint.bmp stub.asm docs/anatomy.svg docs/preview.png \
+	git diff --exit-code --stat -- fixpoint.bmp stub.asm docs/fieldguide.svg docs/anatomy.svg docs/preview.png \
 		site/static/favicon.png site/static/apple-touch-icon.png
 	say "test: check every claim, then boot it"
 	"$PYTHON" verify.py

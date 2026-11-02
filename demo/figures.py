@@ -3,7 +3,10 @@
 docs/preview.png  the image, scaled 3x with no smoothing.
 site/static/favicon.png, site/static/apple-touch-icon.png
                   the edge of the light cone, cut from the image, in big pixels.
-docs/anatomy.svg  figure 1: the boot sector read as a bmp palette, with the path
+docs/fieldguide.svg
+                  figure 1: the picture at 3x, with a field guide to what's in it,
+                  every region computed from the pixels.
+docs/anatomy.svg  figure 2: the boot sector read as a bmp palette, with the path
                   the cpu takes through it and, below, its instructions.
 
 the path is not taken from build.py. it is traced from fixpoint.bmp: start at
@@ -21,12 +24,18 @@ everywhere, including on github.
 usage: python3 demo/figures.py   (from the repo root; needs ndisasm, pillow, matplotlib)
 """
 
+import base64
+import hashlib
+import io
 import os
+import re
 import subprocess
+from collections import deque
 from functools import cache
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
 from PIL import Image
@@ -502,7 +511,7 @@ def anatomy():
         ycap,
         W - 32,
         [
-            ("Figure 1.", "cmb10"),
+            ("Figure 2.", "cmb10"),
             (" The first 512 bytes of ", "cmr10"),
             ("fixpoint.bmp", "cmtt10"),
             (". (a) The headers. The CPU starts at byte 0: ", "cmr10"),
@@ -537,7 +546,7 @@ def anatomy():
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
         f'viewBox="0 0 {int(W)} {int(H)}" width="{int(W * 1.25)}" height="{int(H * 1.25)}">\n'
-        "<title>Figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, "
+        "<title>Figure 2: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, "
         "with the path the cpu takes through them and its instructions</title>\n"
         f"<style>{''.join(style)}</style>\n"
         f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n{body}\n</svg>\n'
@@ -573,7 +582,245 @@ def icons():
         save(image.crop((x, y, x + side, y + side)).resize((side * scale,) * 2, Image.NEAREST), path)
 
 
+# ------------------------------------------------------------------ the field guide
+#
+# figure 1: the picture at 3x, with what is in it. every region is computed from the
+# pixels, not drawn: a pixel is reached if it differs from the same rule run on the
+# ether alone. pointing at a name dims everything else; scattered pixels get rings.
+
+GUIDE = "docs/fieldguide.svg"
+S = 3  # screen pixels per image pixel
+
+
+def untouched():
+    """the universe without the program: row 0 all ether, then rule 110 on the same tape."""
+    px = np.frombuffer(Image.open(BMP).tobytes(), np.uint8)
+    t = np.zeros(320 * 200, np.uint8)
+    t[:320] = np.resize(px[:14], 320)
+    for i in range(321, 320 * 200):
+        left, centre, right = int(t[i - 321]), int(t[i - 320]), int(t[i - 319])
+        t[i] = (centre | right) & ~(left & centre & right) & 0xFF
+    return px.reshape(200, 320), t.reshape(200, 320)
+
+
+def flood(mask, seeds, diagonal=False):
+    """the cells of mask connected to any seed."""
+    steps = [(1, 0), (-1, 0), (0, 1), (0, -1)] + ([(1, 1), (1, -1), (-1, 1), (-1, -1)] if diagonal else [])
+    out = np.zeros_like(mask)
+    todo = deque(s for s in seeds if mask[s])
+    for s in todo:
+        out[s] = True
+    while todo:
+        y, x = todo.popleft()
+        for dy, dx in steps:
+            yy, xx = y + dy, x + dx
+            if 0 <= yy < 200 and 0 <= xx < 320 and mask[yy, xx] and not out[yy, xx]:
+                out[yy, xx] = True
+                todo.append((yy, xx))
+    return out
+
+
+def interior(mask):
+    """a point well inside a region: the cell that survives the most erosions."""
+    depth, m = np.zeros(mask.shape, int), mask.copy()
+    while m.any():
+        depth += m
+        m = m & np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1)
+        m[0, :] = m[-1, :] = m[:, 0] = m[:, -1] = False
+    y, x = np.unravel_index(np.argmax(depth), depth.shape)
+    return x, y
+
+
+def png_uri(image):
+    buf = io.BytesIO()
+    image.save(buf, "PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def spotlight(mask):
+    """white veil over everything outside the mask."""
+    veil = np.where(mask, 0, 200).astype(np.uint8)
+    return Image.merge("LA", (Image.new("L", (320, 200), 255), Image.fromarray(veil)))
+
+
+def regions():
+    px, ether = untouched()
+    reached = px != ether
+    dark = np.isin(px, [0, 255])
+    program = np.zeros_like(reached)
+    program[0, 190:320] = True
+    cone = flood(reached, [(0, x) for x in range(190, 320)])
+    corner = flood(reached & dark, [(0, x) for x in range(306, 320)], diagonal=True)
+    code = {(b - PAL) // 4 for off, n, _ in trace() for b in range(off, off + n) if b >= PAL}
+    return [
+        # (name, what it is, mask, ring the pixels, marker or None)
+        ("the program", "130 bytes of code at the end of row 0. it draws everything else", program, False, "top"),
+        ("the ether", "rule 110's endless background, wherever the program hasn't reached", ~reached, False, "in"),
+        ("the light cone", "everywhere the program has reached so far", cone, False, "in"),
+        (
+            "the cone, wrapped around",
+            "the same influence, back on the left. its stripes are gliders",
+            reached & ~cone,
+            False,
+            "in",
+        ),
+        (
+            "out of step",
+            "the program's last 14 bytes are ether, laid down 12 cells out of phase",
+            corner,
+            False,
+            "corner",
+        ),
+        (
+            "false calm",
+            f"{int((reached & dark & ~corner).sum())} reached pixels that happen to look untouched",
+            reached & dark & ~corner,
+            True,
+            None,
+        ),
+        (
+            "the boot signature",
+            f"55 AA is a shade of orange, used {int((px == 0x72).sum())} times",
+            px == 0x72,
+            True,
+            None,
+        ),
+        (
+            "the bootloader",
+            f"pixels in the {len(code)} colours that are also code",
+            np.isin(px, list(code)),
+            True,
+            None,
+        ),
+    ]
+
+
+GUIDE_STYLE = ".spot,.rings{opacity:0}.item{outline:none;cursor:default}.item>rect{fill:#ffe7a0;fill-opacity:0}"
+GUIDE_LIT = (
+    "svg:has(.g{k}:hover,.g{k}:focus) .spot{k},svg:has(.g{k}:hover,.g{k}:focus) .rings{k}{{opacity:1}}"
+    "svg:has(.g{k}:hover,.g{k}:focus) .item.g{k}>rect{{fill-opacity:1}}"
+    "svg:has(.g{k}:hover,.g{k}:focus) .marker.g{k} circle{{fill:#ffe7a0;stroke-width:1.4}}"
+)
+
+
+def pixels_of(svg):
+    """the svg with each embedded png replaced by a digest of its decoded pixels."""
+
+    def digest(m):
+        image = Image.open(io.BytesIO(base64.b64decode(m.group(1)))).convert("RGBA")
+        return hashlib.sha256(image.tobytes()).hexdigest()
+
+    return re.sub(r"data:image/png;base64,([A-Za-z0-9+/=]+)", digest, svg)
+
+
+def write_svg(path, svg):
+    # pillow and zlib versions compress the same pixels differently; rewrite only a real change
+    if os.path.exists(path) and pixels_of(Path(path).read_text()) == pixels_of(svg):
+        return
+    Path(path).write_text(svg)
+
+
+def fieldguide():
+    t = Type()
+    found = regions()
+    image = Image.open(BMP)
+    x0, y0, width = 20, 40, 320 * S
+    o, style = [], [GUIDE_STYLE]
+    o.append(
+        f'<image x="{x0}" y="{y0}" width="{width}" height="{200 * S}" href="{png_uri(image)}" '
+        'style="image-rendering:pixelated" image-rendering="optimizeSpeed"/>'
+    )
+    for k, (_, _, mask, ring, _) in enumerate(found, 1):
+        o.append(
+            f'<image class="spot spot{k}" x="{x0}" y="{y0}" width="{width}" height="{200 * S}" '
+            f'href="{png_uri(spotlight(mask))}" style="image-rendering:pixelated" image-rendering="optimizeSpeed"/>'
+        )
+        # rings help only where pixels are sparse; past a few hundred the spotlight alone is clearer
+        if ring and mask.sum() <= 400:
+            ys, xs = np.nonzero(mask)
+            circles = "".join(
+                f'<circle cx="{x0 + (x + 0.5) * S:.1f}" cy="{y0 + (y + 0.5) * S:.1f}" r="4.5"/>'
+                for y, x in zip(ys, xs, strict=True)
+            )
+            o.append(f'<g class="rings rings{k}" fill="none" stroke="#000" stroke-width="1.2">{circles}</g>')
+        style.append(GUIDE_LIT.format(k=k))
+
+    def badge(cx, cy, k, cls):
+        return (
+            f'<g class="{cls} g{k}" tabindex="0"><circle cx="{cx:.1f}" cy="{cy:.1f}" r="11" fill="#fff" '
+            f'stroke="#000" stroke-width="1"/>{t.text(cx, cy + 4.8, str(k), "cmr10", 14, "middle")}</g>'
+        )
+
+    for k, (_, _, mask, _, marker) in enumerate(found, 1):
+        if marker == "top":  # a bracket over the program, above the picture
+            xa, xb = x0 + 190 * S, x0 + 320 * S
+            o.append(f'<path d="M{xa} {y0 - 3}V{y0 - 9}H{xb}V{y0 - 3}" fill="none" stroke="#000" stroke-width="0.8"/>')
+            o.append(badge((xa + xb) / 2, y0 - 22, k, "marker"))
+        elif marker == "corner":  # beside the triangle, pointing at it
+            ys, xs = np.nonzero(mask)
+            cx, cy = x0 + xs.mean() * S, y0 + ys.mean() * S
+            o.append(badge(cx - 34, cy + 22, k, "marker"))
+            o.append(
+                f'<path d="M{cx - 27:.1f} {cy + 16:.1f}L{cx - 4:.1f} {cy + 2:.1f}" stroke="#000" stroke-width="0.8"/>'
+            )
+        elif marker == "in":
+            x, y = interior(mask)
+            o.append(badge(x0 + (x + 0.5) * S, y0 + (y + 0.5) * S, k, "marker"))
+
+    # the legend, two columns under the picture
+    yl, lead, col = y0 + 200 * S + 42, 46, width / 2
+    for k, (name, what, _, ring, _) in enumerate(found, 1):
+        cx = x0 + (col if k > (len(found) + 1) // 2 else 0)
+        y = yl + ((k - 1) % ((len(found) + 1) // 2)) * lead
+        icon = (
+            f'<circle cx="{cx + 11:.1f}" cy="{y - 5:.1f}" r="6.5" fill="none" stroke="#000" stroke-width="1.4"/>'
+            if ring
+            else f'<circle cx="{cx + 11:.1f}" cy="{y - 5:.1f}" r="11" fill="#fff" stroke="#000" stroke-width="1"/>'
+            + t.text(cx + 11, y - 0.2, str(k), "cmr10", 14, "middle")
+        )
+        assert t.width(what, "cmr10", 13) < col - 44, f"legend line too long for its column: {what}"
+        body = t.text(cx + 32, y, name, "cmb10", 15) + t.text(cx + 32, y + 19, what, "cmr10", 13, fill=GREY)
+        o.append(
+            f'<g class="item g{k}" tabindex="0"><rect x="{cx - 4:.1f}" y="{y - 20:.1f}" width="{col - 8:.1f}" '
+            f'height="{lead - 2}"/>{icon}{body}</g>'
+        )
+    rows = (len(found) + 1) // 2
+    ycap = yl + rows * lead + 16
+    cap, n = t.wrap(
+        x0,
+        ycap,
+        width,
+        [
+            ("Figure 1.", "cmb10"),
+            (" ", "cmr10"),
+            ("fixpoint.bmp", "cmtt10"),
+            (
+                " at three times its size, and a field guide to what's in it. Every region is computed from the "
+                "pixels: a pixel counts as reached if it differs from the same rule run on the ether alone. "
+                "Numbered regions are areas; ringed ones are scattered pixels.",
+                "cmr10",
+            ),
+        ],
+        size=14,
+        leading=19,
+    )
+    o.append(cap)
+    W, H = width + 2 * x0, ycap + n * 19 + 6
+    defs = "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in sorted(t.defs.items()))
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+        f'viewBox="0 0 {int(W)} {int(H)}" width="{int(W)}" height="{int(H)}">\n'
+        "<title>Figure 1: fixpoint.bmp at three times its size, with a field guide to the program, the ether, "
+        "the light cone and the details hidden in it</title>\n"
+        f"<style>{''.join(style)}</style>\n"
+        f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n' + "\n".join(o) + "\n</svg>\n"
+    )
+    write_svg(GUIDE, svg)
+    print(f"{GUIDE}: {len(found)} regions, {len(svg) // 1024} KB")
+
+
 if __name__ == "__main__":
+    fieldguide()
     anatomy()
     preview()
     icons()

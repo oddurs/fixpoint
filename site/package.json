@@ -4,8 +4,8 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "prebuild": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/anatomy.svg static/docs/",
-    "predev": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/anatomy.svg static/docs/",
+    "prebuild": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/*.svg static/docs/",
+    "predev": "mkdir -p static/docs && cp ../fixpoint.bmp static/ && cp ../docs/*.svg static/docs/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint ."
