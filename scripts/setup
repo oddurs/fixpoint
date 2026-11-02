@@ -20,13 +20,13 @@ if command -v uv >/dev/null 2>&1; then
 	fi
 	[ -x .venv/bin/python ] || uv venv -q --python "$want" .venv
 	uv pip install -q --python .venv/bin/python -r requirements-dev.txt
-	echo "python: .venv ready ($(.venv/bin/python --version), $(.venv/bin/ruff --version))"
+	echo "python: .venv ready ($(.venv/bin/python --version); ruff, shellcheck, shfmt pinned in requirements-dev.txt)"
 else
 	echo "python: uv not found; install it, or make a python $(cat .python-version) environment from requirements-dev.txt" >&2
 fi
 
 missing=0
-for tool in nasm ndisasm qemu-system-i386 node npm gh shellcheck shfmt; do
+for tool in nasm ndisasm qemu-system-i386 node npm gh; do
 	if command -v "$tool" >/dev/null 2>&1; then
 		echo "tool: $tool ok"
 	else
@@ -42,7 +42,7 @@ for tool in ffmpeg gdb; do
 	fi
 done
 if [ "$missing" != 0 ]; then
-	echo "setup: install the missing tools (macos: brew install nasm qemu node gh shellcheck shfmt)" >&2
+	echo "setup: install the missing tools (macos: brew install nasm qemu node gh)" >&2
 	exit 1
 fi
 echo "setup: done"

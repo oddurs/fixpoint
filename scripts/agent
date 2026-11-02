@@ -58,13 +58,16 @@ doctor() {
 	echo "  ok    default branch: $default"
 	probe "hooks: .githooks" "hooks not wired: scripts/setup" test "$(git config core.hooksPath)" = .githooks
 	probe "gh: authenticated" "gh: not authenticated: gh auth login" gh auth status
-	for tool in nasm ndisasm qemu-system-i386 node npm make shellcheck shfmt; do
+	for tool in nasm ndisasm qemu-system-i386 node npm make; do
 		probe "$tool" "$tool missing: scripts/setup" command -v "$tool"
 	done
 	venv=$(git rev-parse --show-toplevel)/.venv
 	[ -x "$venv/bin/python" ] || venv=$main_root/.venv
-	probe "python requirements and ruff ($venv)" "python environment incomplete: scripts/setup" \
-		"$venv/bin/python" -c "import numpy, PIL, matplotlib, fontTools; import shutil; assert shutil.which('ruff', path='$venv/bin')"
+	probe "python requirements ($venv)" "python requirements missing: scripts/setup" \
+		"$venv/bin/python" -c "import numpy, PIL, matplotlib, fontTools"
+	for tool in ruff shellcheck shfmt; do
+		probe "$tool (pinned)" "$tool missing from $venv: scripts/setup" test -x "$venv/bin/$tool"
+	done
 	if [ -z "$(git status --porcelain)" ]; then
 		echo "  ok    tree clean"
 	else

@@ -8,15 +8,15 @@ set -eu
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
-# a .venv made by scripts/setup wins; ci installs into the system python instead
+# a .venv made by scripts/setup wins, with the pinned python, ruff, shellcheck and shfmt;
+# ci pip-installs the same pins into its python, already on PATH
 if [ -x .venv/bin/python ]; then
+	PATH=$root/.venv/bin:$PATH
 	PYTHON=$root/.venv/bin/python
-	RUFF=$root/.venv/bin/ruff
 else
 	PYTHON=${PYTHON:-python3}
-	RUFF=ruff
 fi
-export PYTHON
+export PATH PYTHON
 
 SHELL_FILES="scripts/task scripts/agent scripts/setup .githooks/commit-msg .githooks/pre-commit .githooks/pre-push"
 
@@ -25,7 +25,7 @@ say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
 # the site's tools live in site/node_modules; reinstall when the lockfile is newer
 site_deps() {
 	if [ ! -f site/node_modules/.package-lock.json ] ||
-		[ site/package-lock.json -nt site/node_modules/.package-lock.json ]; then
+		[ -n "$(find site/package-lock.json -newer site/node_modules/.package-lock.json)" ]; then
 		say "site: npm ci"
 		(cd site && npm ci --silent)
 	fi
@@ -33,7 +33,7 @@ site_deps() {
 
 fmt() {
 	say "fmt: ruff, shfmt, prettier"
-	"$RUFF" format --quiet .
+	ruff format --quiet .
 	# shellcheck disable=SC2086 # a fixed list of paths without spaces
 	shfmt -w $SHELL_FILES
 	site_deps
@@ -42,7 +42,7 @@ fmt() {
 
 fmt_check() {
 	say "fmt:check: ruff, shfmt, prettier"
-	"$RUFF" format --check --quiet .
+	ruff format --check --quiet .
 	# shellcheck disable=SC2086
 	shfmt -d $SHELL_FILES
 	site_deps
@@ -51,7 +51,7 @@ fmt_check() {
 
 lint() {
 	say "lint: ruff, shellcheck, eslint"
-	"$RUFF" check --quiet .
+	ruff check --quiet .
 	# shellcheck disable=SC2086
 	shellcheck -s sh $SHELL_FILES
 	site_deps

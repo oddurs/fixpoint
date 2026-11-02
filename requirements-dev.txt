@@ -1,3 +1,5 @@
 -r requirements.txt
-# the linter and formatter, pinned so every machine and ci agree
+# the linters and formatters, pinned here so every machine and ci run the same versions
 ruff==0.17.3
+shellcheck-py==0.11.0.1
+shfmt-py==4.2.0

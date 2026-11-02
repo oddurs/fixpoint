@@ -29,10 +29,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
-      - name: install nasm, qemu, ffmpeg, shellcheck, shfmt, and the python requirements
+      - name: install nasm, qemu, ffmpeg, and the pinned python requirements and tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm qemu-system-x86 ffmpeg shellcheck shfmt
+          sudo apt-get install -y nasm qemu-system-x86 ffmpeg
           pip install -r requirements-dev.txt
       - run: ./scripts/task check
 
