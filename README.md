@@ -69,7 +69,7 @@ rule 110 being turing-complete is a property of the rule, not a claim about this
 | 54 | 256-colour palette | the bootloader, woven between colours |
 | 446 | palette entries `0x62`–`0x71` | the partition table, with legal status bytes |
 | 510 | palette entry `0x72` | `55 AA`, the boot signature |
-| 1078 | pixels | row 0: the ether, then the program |
+| 1,078 | pixels | row 0: the ether, then the program |
 | 65,078 | padding, so the size field is true | a zip of the source, for `unzip` |
 
 ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, all active. it doesn't mention the picture.

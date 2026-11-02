@@ -88,6 +88,9 @@ code {
 	font-family: var(--mono);
 	font-size: 0.92em;
 	hyphens: none;
+	/* the body's tighter word spacing is for latin modern roman. in monospace, every
+	   space must stay one column wide, or padded comments drift out of line */
+	word-spacing: normal;
 }
 
 main {
@@ -184,7 +187,6 @@ figcaption {
 .body .figure svg {
 	display: block;
 	width: 100%;
-	min-width: 720px;
 	height: auto;
 }
 .body .hint {
@@ -195,9 +197,20 @@ figcaption {
 	text-align: center;
 	text-indent: 0;
 }
-@media (hover: none) {
-	.body .hint {
-		display: none;
+/* pointing only works with a pointer and room to aim; anywhere else the figure is
+   too small to read in place, so offer it on its own, where it can be zoomed */
+.hint .full,
+.hint .point {
+	display: none;
+}
+@media (hover: hover) and (min-width: 761px) {
+	.hint .point {
+		display: inline;
+	}
+}
+@media (hover: none), (max-width: 760px) {
+	.hint .full {
+		display: inline;
 	}
 }
 
@@ -256,6 +269,7 @@ pre {
 	background: var(--shade);
 	border-left: 2px solid var(--edge);
 	font: 0.8em/1.55 var(--mono);
+	word-spacing: normal;
 	text-align: left;
 	hyphens: none;
 	tab-size: 4;
@@ -358,5 +372,9 @@ footer p {
 	.body table {
 		display: block;
 		overflow-x: auto;
+	}
+	/* a phone has no room for the dates; the name, size and gloss are the listing */
+	.listing :is(th, td):nth-child(2) {
+		display: none;
 	}
 }
