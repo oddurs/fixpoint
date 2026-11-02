@@ -6,7 +6,7 @@
 	let { data } = $props();
 
 	const repo = 'https://github.com/oddurs/fixpoint';
-	const site = 'https://oddurs.github.io/fixpoint/';
+	const site = 'https://fixpoint.oddurs.com/';
 	const title = 'fixpoint: an image that boots and computes itself';
 	const description =
 		'a 320×200 bmp that is also a boot sector. boot it and the cpu draws the same picture again: rule 110 in its ether, and the light cone of the 130-byte program hiding in its top row.';

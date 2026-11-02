@@ -28,8 +28,6 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - name: build the site
         working-directory: site
-        env:
-          BASE_PATH: /fixpoint
         run: |
           npm ci
           npm run build
