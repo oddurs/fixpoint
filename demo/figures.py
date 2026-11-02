@@ -1,6 +1,8 @@
 """draw the readme's figures from fixpoint.bmp itself.
 
 docs/preview.png  the image, scaled 3x with no smoothing.
+site/static/favicon.png, site/static/apple-touch-icon.png
+                  the edge of the light cone, cut from the image, in big pixels.
 docs/anatomy.svg  figure 1: the boot sector read as a bmp palette, with the path
                   the cpu takes through it and, below, its instructions.
 
@@ -547,15 +549,31 @@ def anatomy():
     )
 
 
+def save(image, path):
+    # pillow versions compress the same pixels differently; rewrite only a real change
+    if os.path.exists(path) and Image.open(path).convert("RGB").tobytes() == image.tobytes():
+        return
+    image.save(path)
+
+
 def preview():
     image = Image.open(BMP).convert("RGB")
-    image = image.resize((3 * image.width, 3 * image.height), Image.NEAREST)
-    # pillow versions compress the same pixels differently; rewrite only a real change
-    if os.path.exists(PREVIEW) and Image.open(PREVIEW).convert("RGB").tobytes() == image.tobytes():
-        return
-    image.save(PREVIEW)
+    save(image.resize((3 * image.width, 3 * image.height), Image.NEAREST), PREVIEW)
+
+
+ICON_CENTRE = (122, 154)  # where the right cone's edge meets the dark ether, row 154
+ICONS = {"site/static/favicon.png": (32, 2), "site/static/apple-touch-icon.png": (45, 4)}  # side, scale
+
+
+def icons():
+    image = Image.open(BMP).convert("RGB")
+    cx, cy = ICON_CENTRE
+    for path, (side, scale) in ICONS.items():
+        x, y = cx - side // 2, cy - side // 2
+        save(image.crop((x, y, x + side, y + side)).resize((side * scale,) * 2, Image.NEAREST), path)
 
 
 if __name__ == "__main__":
     anatomy()
     preview()
+    icons()
