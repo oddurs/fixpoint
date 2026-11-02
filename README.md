@@ -4,7 +4,7 @@ an 88 KB image that boots and computes itself.
 
 *a picture of its own consequences.*
 
-**[watch it boot →](https://oddurs.github.io/fixpoint)**
+**[watch it boot →](https://fixpoint.oddurs.com)**
 
 ![fixpoint.bmp, scaled 3x](docs/preview.png)
 
@@ -104,7 +104,7 @@ make site       # build the project page into site/build
 | [`verify.py`](verify.py) | checks every claim, then boots the image in qemu and reads back video memory |
 | [`demo/record.py`](demo/record.py) | records the demo video: the bios in real time, then the computation under gdb, paused by a breakpoint on the program's own loop every two rows. every frame is the real screen |
 | [`demo/figures.py`](demo/figures.py) | draws the figures in `docs/`, tracing the cpu's path by disassembling the file |
-| [`site/`](site) | the [project page](https://oddurs.github.io/fixpoint), sveltekit, prerendered with no client-side js |
+| [`site/`](site) | the [project page](https://fixpoint.oddurs.com), sveltekit, prerendered with no client-side js |
 
 ## lineage
 
