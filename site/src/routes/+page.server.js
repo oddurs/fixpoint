@@ -94,15 +94,22 @@ function size(path) {
 	return n < 1024 ? `${n}` : n < 1048576 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
 }
 
-/** the post's svg figures, inlined: their own css lights up an instruction's bytes when
-    you point at it (see demo/figures.py), and that only works in the page, not in an <img> */
+/** what pointing does in each figure; the css that does it is in the svg (demo/figures.py) */
+const hints = {
+	'docs/fieldguide.svg': 'point at a name to see where it lives in the picture.',
+	'docs/anatomy.svg': 'point at an instruction or a byte of the path to find the other.'
+};
+
+/** the post's svg figures, inlined: their own css responds to the pointer, and that only
+    works in the page, not in an <img> */
 function inline(html) {
 	return html.replace(/<p><img src="([^"]+\.svg)" alt="([^"]*)"\s*\/?><\/p>/g, (_, src, alt) => {
 		const svg = readFileSync(root + src, 'utf8')
 			.trim()
 			.replace('<svg ', `<svg aria-label="${alt}" `);
-		const full = `<a class="full" href="/${src}">open figure 1 on its own, full size</a>`;
-		const point = '<span class="point">point at an instruction or a byte of the path to find the other.</span>';
+		const figure = alt.match(/^figure \d+/)[0];
+		const full = `<a class="full" href="/${src}">open ${figure} on its own, full size</a>`;
+		const point = `<span class="point">${hints[src]}</span>`;
 		return `<p class="figure">${svg}</p>\n<p class="hint">${point}${full}</p>`;
 	});
 }
@@ -113,30 +120,9 @@ export function load() {
 		(_, level, text) => `<h${level} id="${slug(text)}">${text}</h${level}>`
 	);
 
-	// [path in the repo, path served by the site or null if it links to the repo, gloss]
-	const files = [
-		['fixpoint.bmp', 'fixpoint.bmp', 'the image, the disk, the archive'],
-		['main.asm', null, 'the program, 130 bytes of it'],
-		['stub.asm', null, 'the bootloader, woven into the palette'],
-		['build.py', null, 'lays out the file, places the stub'],
-		['verify.py', null, 'checks every claim, then boots it'],
-		['demo/record.py', null, 'records the video under gdb'],
-		['demo/figures.py', null, 'draws figure 1 from the file'],
-		['docs/anatomy.svg', 'docs/anatomy.svg', 'figure 1'],
-		['site/static/demo.mp4', 'demo.mp4', 'the video']
-	].map(([path, served, what]) => ({
-		name: path.replace('site/static/', ''),
-		path,
-		served,
-		what,
-		date: touched(path, '%cs'),
-		size: size(path)
-	}));
-
 	const modified = new Date(touched('.'));
 	return {
 		html,
-		files,
 		iso: modified.toISOString(),
 		date: modified
 			.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })

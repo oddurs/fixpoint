@@ -19,6 +19,8 @@ on real hardware it needs a legacy bios, or uefi's compatibility mode, and vga. 
 
 ## what you're looking at
 
+![figure 1: fixpoint.bmp at three times its size, with a field guide to the program, the ether, the light cone and the details hidden in it](docs/fieldguide.svg)
+
 every row is the row above it, run through [rule 110](https://en.wikipedia.org/wiki/Rule_110), a one-dimensional cellular automaton that is turing-complete. the top row is where it starts: the last 130 pixels are the program, and the 190 before them are rule 110's **ether**, a background pattern that repeats every 14 cells and every 7 generations. the ether is the fabric of [matthew cook's proof](https://doi.org/10.25088/ComplexSystems.15.1.1) that rule 110 is universal: his gliders, the moving structures that carry information, travel through it. here, the only thing travelling is the program.
 
 each pixel is a byte, so every cell holds eight rule 110 universes, one per bit. the ether is the same in all eight. the program's bits differ from universe to universe, so the program is the only thing that can make them disagree, and the palette shows exactly that:
@@ -26,9 +28,9 @@ each pixel is a byte, so every cell holds eight rule 110 universes, one per bit.
 - **where all eight universes agree**, the cell is `00` or `FF`, drawn in two close, quiet shades. this is the woven dark V: the universe exactly as it would have been if the program weren't there. it hasn't heard yet.
 - **where they disagree**, the cell is in the program's causal future: its light cone. universe 6 decides whether it's light (coral to gold) or dark (indigo to plum), so its triangles show through, and the other seven set the hue.
 
-every cell the program hasn't reached is dark, without exception. inside the cone, 0.93% of cells happen to agree anyway, and look dark too. they look untouched. they aren't.
+every cell the program hasn't reached is dark, without exception. inside the cone, 0.93% of cells look dark too: 306 by chance, and 78 in a small triangle at the top right (see below). they look untouched. they aren't.
 
-the cone's edges move at about 0.63 cells per generation to the right and 0.49 to the left, close to the speeds of rule 110's two fastest gliders, which cook calls A and B: 2/3 and 1/2. the left cone is the program's influence leaving the right edge of the screen and coming back on the left, because the screen is one continuous tape. the diagonal stripes in it are glider trains. and the dark corner at the top right is the program's own last 14 bytes, which are one period of the ether, so the program ends in the fabric it disturbs.
+for the first 30 generations the cone's right edge barely moves. after that, until the cone grows wide enough to overlap itself on the tape, its edges move at about 0.62 cells per generation to the right and 0.48 to the left, close to the speeds of rule 110's two fastest gliders, which cook calls A and B: 2/3 and 1/2. the left cone is the program's influence leaving the right edge of the screen and coming back on the left, because the screen is one continuous tape. the diagonal stripes in it are glider trains. and the dark corner at the top right is the program's own last 14 bytes, which are one period of the ether, laid down 12 cells out of phase with the rest: under them sits a triangle of out-of-step ether, 13 rows deep. the program ends in the fabric it disturbs, just not quite in time with it.
 
 the screen is treated as one tape, 64,000 cells long, folded into rows of 320. a cell's neighbours are the three cells 320 positions back, so there's no edge handling, and the whole computation is one loop:
 
@@ -59,7 +61,7 @@ rule 110 being turing-complete is a property of the rule, not a claim about this
 
 ## how one file is a picture, a disk, and an archive
 
-![figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, with the path the cpu takes through them and the instructions it runs](docs/anatomy.svg)
+![figure 2: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, with the path the cpu takes through them and the instructions it runs](docs/anatomy.svg)
 
 | offset | as a bmp | as a disk |
 |---|---|---|
@@ -76,7 +78,7 @@ ask `file` what it is and it says `DOS/MBR boot sector`, with four partitions, a
 
 - **the file size is a jump instruction.** its low byte is `EB`, `jmp short`, and the next byte is the distance into the palette. the file is padded until the size it claims is true, and the padding holds a zip of `main.asm`, `stub.asm`, and `build.py`, so the file carries its own source.
 - **the boot sector is palette colours.** the signature `55 AA` is the blue and green of entry `0x72`, and the four partition status bytes are blue channels, set to `80`, one of the two values a status byte may hold, because some bioses refuse a disk whose table holds anything else. all four say active, which a strict reading of the format wouldn't allow. all five entries have bit 6 set, so they're already warm colours: the boot sector moves them by at most 30 levels in any channel. the two bytes every bios looks for first are one of the oranges in the cone. they appear 107 times in the picture, if you know where to look.
-- **the bootloader is woven into the palette.** its 36 bytes would otherwise be 36 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in figure 1 above, they're the swatches the traced path runs through. [`stub.asm`](stub.asm) writes out every palette entry it hops over, with its colour.
+- **the bootloader is woven into the palette.** its 36 bytes would otherwise be 36 wrong colours. `build.py` runs a dynamic program over instruction orders, alternate encodings, harmless fillers (`nop`, `inc bp`, `dec di`), and `jmp short` hops over colours it would rather leave alone, and picks the layout whose bytes disturb the picture least: 10 colours shift, about 1% of the pixels. the saturated blue and magenta specks you can find are the bootloader showing through; in figure 2 above, they're the swatches the traced path runs through. [`stub.asm`](stub.asm) writes out every palette entry it hops over, with its colour.
 - **it doesn't care where it starts.** until its final far jump, the bootloader uses only relative jumps, so it runs the same whether the bios starts it at `0000:7C00` or `07C0:0000`.
 - **it stays clear of the bpb.** a bios booting a usb stick as a floppy may rewrite bytes 11–61 in memory. nothing executable lives there, and the program reads the palette from a fresh copy off the disk.
 - **it retries.** a failed disk read loops back to the read, instead of jumping into whatever happened to be in memory.
