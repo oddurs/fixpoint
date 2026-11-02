@@ -17,7 +17,8 @@ import numpy as np
 from PIL import Image
 
 W, H = 320, 200
-CHROME = ("google-chrome", "chromium", "chromium-browser")
+CHROME = ("google-chrome", "chromium", "chromium-browser",
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 results = []
 
 
@@ -76,6 +77,7 @@ def boot(path, timeout=30):
     finally:
         qemu.kill()
         qemu.wait()
+        shutil.rmtree(tmp)
 
 
 def rule110(row0):
@@ -116,7 +118,6 @@ def ffmpeg_decode(path, tmp):
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "fixpoint.bmp"
     data = open(path, "rb").read()
-    tmp = tempfile.mkdtemp()
 
     print("as a bmp")
     ref = Image.open(path)
@@ -127,7 +128,8 @@ def main():
     check("pixels are the bytes at the pixel offset", ref.tobytes() == data[offset:offset + W * H])
     rgb = ref.convert("RGB")
     for name, decode in (("ffmpeg", ffmpeg_decode), ("chrome", chrome_decode)):
-        im = decode(path, tmp)
+        with tempfile.TemporaryDirectory() as tmp:
+            im = decode(path, tmp)
         if im is None:
             skip(f"{name} decodes the same pixels", "not installed")
         else:
@@ -160,6 +162,9 @@ def main():
     print("as an archive")
     try:
         z = zipfile.ZipFile(io.BytesIO(data))
+        names = sorted(info.filename.split("/", 1)[1] for info in z.infolist())
+        check("carries exactly main.asm, stub.asm and build.py",
+              names == ["build.py", "main.asm", "stub.asm"], ", ".join(names))
         for info in z.infolist():
             name = info.filename.split("/", 1)[1]
             same = os.path.exists(name) and z.read(info) == open(name, "rb").read()

@@ -18,7 +18,7 @@ docs/anatomy.svg: fixpoint.bmp demo/figures.py
 demo: fixpoint.bmp docs/anatomy.svg
 	$(PYTHON) demo/record.py
 
-site: fixpoint.bmp
+site: fixpoint.bmp docs/anatomy.svg
 	cd site && npm ci && npm run build
 
 clean:

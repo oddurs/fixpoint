@@ -25,3 +25,22 @@ jobs:
         run: git diff --exit-code -- fixpoint.bmp stub.asm docs/anatomy.svg
       - name: check every claim (decoders, disk, archive) and boot it
         run: python3 verify.py
+
+  # pages builds the site only after a merge to main; build it here so a pull
+  # request that breaks it fails before then
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: build the site
+        working-directory: site
+        run: |
+          npm ci
+          npm run build
