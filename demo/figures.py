@@ -25,8 +25,10 @@ usage: python3 demo/figures.py   (from the repo root; needs ndisasm, pillow, mat
 """
 
 import base64
+import hashlib
 import io
 import os
+import re
 import subprocess
 from collections import deque
 from functools import cache
@@ -701,6 +703,23 @@ GUIDE_LIT = (
 )
 
 
+def pixels_of(svg):
+    """the svg with each embedded png replaced by a digest of its decoded pixels."""
+
+    def digest(m):
+        image = Image.open(io.BytesIO(base64.b64decode(m.group(1)))).convert("RGBA")
+        return hashlib.sha256(image.tobytes()).hexdigest()
+
+    return re.sub(r"data:image/png;base64,([A-Za-z0-9+/=]+)", digest, svg)
+
+
+def write_svg(path, svg):
+    # pillow and zlib versions compress the same pixels differently; rewrite only a real change
+    if os.path.exists(path) and pixels_of(Path(path).read_text()) == pixels_of(svg):
+        return
+    Path(path).write_text(svg)
+
+
 def fieldguide():
     t = Type()
     found = regions()
@@ -796,7 +815,7 @@ def fieldguide():
         f"<style>{''.join(style)}</style>\n"
         f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n' + "\n".join(o) + "\n</svg>\n"
     )
-    Path(GUIDE).write_text(svg)
+    write_svg(GUIDE, svg)
     print(f"{GUIDE}: {len(found)} regions, {len(svg) // 1024} KB")
 
 
