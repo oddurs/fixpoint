@@ -3,10 +3,6 @@ name: pages
 on:
   push:
     branches: [main]
-  # if pages is set to deploy from the branch, github's own jekyll build of the
-  # readme races this workflow. page_build fires when that build finishes, so this
-  # deploys again after it, and the site always wins.
-  page_build:
   workflow_dispatch:
 
 permissions:
