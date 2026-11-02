@@ -3,8 +3,7 @@
 # checks the toolchain the build and the checks need.
 set -eu
 
-# the python environment lives in the main checkout; scripts/agent start links it into
-# each worktree, so every worktree shares one
+# the python environment lives in the main checkout, where any linked worktree can share it
 root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$root"
 
