@@ -102,7 +102,9 @@ function size(path) {
 function inline(html) {
 	return html.replace(/<p><img src="([^"]+\.svg)" alt="([^"]*)"\s*\/?><\/p>/g, (_, src, alt) => {
 		const svg = readFileSync(root + src, 'utf8').trim().replace('<svg ', `<svg aria-label="${alt}" `);
-		return `<p class="figure">${svg}</p>\n<p class="hint">point at an instruction or a byte of the path to find the other.</p>`;
+		const full = `<a class="full" href="/${src}">open figure 1 on its own, full size</a>`;
+		const point = '<span class="point">point at an instruction or a byte of the path to find the other.</span>';
+		return `<p class="figure">${svg}</p>\n<p class="hint">${point}${full}</p>`;
 	});
 }
 
