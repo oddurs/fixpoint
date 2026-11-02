@@ -1,5 +1,5 @@
 /* a personal page set like it's 2003 and the author owns a copy of the texbook:
-   latin modern, a text block of about 65 characters, justified and hyphenated,
+   latin modern, a text block of about 65 characters, ragged right and hyphenated,
    booktabs tables, listings-style code, and links that are blue and underlined
    because that is what links are. light only. */
 
@@ -155,7 +155,7 @@ figure {
 	margin: 26px 0 30px;
 }
 .wide,
-.body p:has(> img) {
+.body .figure {
 	width: var(--wide);
 	margin-left: 50%;
 	transform: translateX(-50%);
@@ -176,19 +176,32 @@ figcaption {
 	font-size: 0.8em;
 	line-height: 1.45;
 }
-.body p:has(> img) {
+.body .figure {
 	overflow-x: auto;
-	margin-block: 30px;
+	margin-block: 30px 0;
 	text-indent: 0;
 }
-.body img {
+.body .figure svg {
 	display: block;
 	width: 100%;
 	min-width: 720px;
 	height: auto;
 }
+.body .hint {
+	margin: 0 0 30px;
+	color: var(--grey);
+	font-size: 0.8em;
+	font-style: italic;
+	text-align: center;
+	text-indent: 0;
+}
+@media (hover: none) {
+	.body .hint {
+		display: none;
+	}
+}
 
-/* --- the body: justified, hyphenated, indented paragraphs */
+/* --- the body: ragged right, hyphenated, indented paragraphs */
 
 .body {
 	/* ragged right: a browser justifies by stretching spaces line by line, without

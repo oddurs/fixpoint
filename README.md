@@ -57,7 +57,7 @@ rule 110 being turing-complete is a property of the rule, not a claim about this
 
 ## how one file is a picture, a disk, and an archive
 
-![figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, with the path the cpu takes through them](docs/anatomy.svg)
+![figure 1: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, with the path the cpu takes through them and the instructions it runs](docs/anatomy.svg)
 
 | offset | as a bmp | as a disk |
 |---|---|---|
