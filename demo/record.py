@@ -11,7 +11,7 @@ figure 1.
 usage: python3 demo/record.py   (from the repo root; needs qemu-system-i386, gdb,
 ffmpeg, pillow, matplotlib). writes site/static/demo.mp4 and site/static/poster.png.
 """
-import os, socket, subprocess, tempfile, time
+import os, shutil, socket, subprocess, tempfile, time
 
 import matplotlib
 from PIL import Image, ImageDraw, ImageFont
@@ -70,6 +70,7 @@ def capture_boot(step=0.1, limit=600):
     finally:
         qemu.kill()
         qemu.wait()
+        shutil.rmtree(tmp)
     return frames
 
 
@@ -112,7 +113,9 @@ continue
         qemu.kill()
         qemu.wait()
     paths = sorted(p for p in os.listdir(tmp) if p.endswith(".ppm"))
-    return [Image.open(os.path.join(tmp, p)).convert("RGB") for p in paths]
+    frames = [Image.open(os.path.join(tmp, p)).convert("RGB") for p in paths]
+    shutil.rmtree(tmp)                           # a hundred 750 KB screendumps
+    return frames
 
 
 def distinct(frames):
