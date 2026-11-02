@@ -10,14 +10,14 @@
 bits 16
 org 0x7C5D
 
-    dec dx
-    mov dh, 0
+    dec dx                      ; undo the B: dl = boot drive
+    mov dh, 0                   ; head 0
     dec di                      ; filler, for its colour
     nop                         ; filler, for its colour
     nop                         ; filler, for its colour
     inc bp                      ; filler, for its colour
     push byte 0
-    mov cx, 0x0001
+    mov cx, 0x0001              ; cylinder 0, sector 1
     jmp short .h1               ; hop over 99 bytes of palette
     db 0x37, 0x61, 0x00         ; entry 0D  green, red, unused
     db 0x81, 0x37, 0x61, 0x00   ; entry 0E  #613781
@@ -45,13 +45,13 @@ org 0x7C5D
     db 0x7E, 0x33, 0x54, 0x00   ; entry 24  #54337e
     db 0x81, 0x37, 0x61, 0x00   ; entry 25  #613781
 .h1:
-    mov bx, 0x8000
-    pop es
+    mov bx, 0x8000              ; to 0000:8000
+    pop es                      ; es = 0
 read:
-    mov ah, 2
-    mov al, 3
+    mov ah, 2                   ; read sectors
+    mov al, 3                   ; three
     int 0x13
-    jc read
+    jc read                     ; until it works
     nop                         ; filler, for its colour
     inc bp                      ; filler, for its colour
     dec di                      ; filler, for its colour

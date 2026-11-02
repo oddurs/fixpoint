@@ -97,11 +97,12 @@ function size(path) {
 	return n < 1024 ? `${n}` : n < 1048576 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
 }
 
-/** width and height for the readme's images, from their own viewBox, so nothing shifts as they load */
-function dimensions(html) {
-	return html.replace(/<img src="([^"]+\.svg)"/g, (tag, src) => {
-		const [, , w, h] = readFileSync(root + src, 'utf8').match(/viewBox="([\d.]+ [\d.]+ )?([\d.]+) ([\d.]+)"/);
-		return `${tag} width="${Math.round(w)}" height="${Math.round(h)}" loading="lazy" decoding="async"`;
+/** the readme's svg figures, inlined: their own css lights up an instruction's bytes when
+    you point at it (see demo/figures.py), and that only works in the page, not in an <img> */
+function inline(html) {
+	return html.replace(/<p><img src="([^"]+\.svg)" alt="([^"]*)"\s*\/?><\/p>/g, (_, src, alt) => {
+		const svg = readFileSync(root + src, 'utf8').trim().replace('<svg ', `<svg aria-label="${alt}" `);
+		return `<p class="figure">${svg}</p>\n<p class="hint">point at an instruction or a byte of the path to find the other.</p>`;
 	});
 }
 
@@ -114,7 +115,7 @@ export function load() {
 		.replace(/\n\| file \| what it is \|\n(\|.*\n)+/, '\n') // the files section lists them
 		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}/blob/main/$2)`); // repo links
 
-	const html = dimensions(smart(marked.parse(body))).replace(
+	const html = inline(smart(marked.parse(body))).replace(
 		/<h([23])>([\s\S]*?)<\/h\1>/g,
 		(_, level, text) => `<h${level} id="${slug(text)}">${text}</h${level}>`
 	);
