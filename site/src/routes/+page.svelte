@@ -6,6 +6,7 @@
 	let { data } = $props();
 
 	const repo = 'https://github.com/oddurs/fixpoint';
+	const commands = ['qemu-system-i386 -drive format=raw,file=fixpoint.bmp', 'unzip fixpoint.bmp'];
 	const site = 'https://fixpoint.oddurs.com/';
 	const title = 'fixpoint: an image that boots and computes itself';
 	const description =
@@ -63,7 +64,7 @@
 	<header class="post">
 		<h1><span class="tt">fixpoint</span>: an image that boots and computes itself</h1>
 		<p class="byline">oddur sigurdsson &middot; <time datetime={data.iso}>{data.date}</time></p>
-		<p class="tagline">{data.tagline}</p>
+		<p class="tagline">a picture of its own consequences.</p>
 	</header>
 
 	<p class="lead">
@@ -94,7 +95,7 @@
 	</figure>
 
 	<p class="aside">if you want to try it:</p>
-	<pre class="commands">{#each data.commands as line, i (i)}<span class="prompt" aria-hidden="true">$ </span>{line}{'\n'}{/each}</pre>
+	<pre class="commands">{#each commands as line, i (i)}<span class="prompt" aria-hidden="true">$ </span>{line}{'\n'}{/each}</pre>
 
 	<article class="body">
 		{@html data.html}

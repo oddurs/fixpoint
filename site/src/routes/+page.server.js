@@ -1,12 +1,12 @@
-// the page is the readme, rendered at build time. the readme's head (title, tagline,
-// intro) is replaced by the post's own; everything from its first section on is the
-// body. nothing here runs in the browser: the page ships no javascript.
+// the post's body is site/src/post.md, rendered at build time. it is the page's own
+// text, not the readme's: the two say the same thing for different readers and are
+// edited separately. nothing here runs in the browser: the page ships no javascript.
 
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import readme from '../../../README.md?raw';
+import post from '../post.md?raw';
 
 const repo = 'https://github.com/oddurs/fixpoint';
 const root = process.cwd() + '/../'; // the build runs in site/
@@ -97,7 +97,7 @@ function size(path) {
 	return n < 1024 ? `${n}` : n < 1048576 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
 }
 
-/** the readme's svg figures, inlined: their own css lights up an instruction's bytes when
+/** the post's svg figures, inlined: their own css lights up an instruction's bytes when
     you point at it (see demo/figures.py), and that only works in the page, not in an <img> */
 function inline(html) {
 	return html.replace(/<p><img src="([^"]+\.svg)" alt="([^"]*)"\s*\/?><\/p>/g, (_, src, alt) => {
@@ -109,15 +109,7 @@ function inline(html) {
 }
 
 export function load() {
-	const cut = readme.indexOf('\n## ');
-	const head = readme.slice(0, cut);
-	const body = readme
-		.slice(cut + 1)
-		.replace(/\n## license[\s\S]*$/, '\n') // the footer has the license
-		.replace(/\n## build\n[\s\S]*?(?=\n## )/, '\n') // how to build it is the repo's business, not the post's
-		.replace(/(?<!!)\[([^\]]*)\]\((?!https?:|#)([^)]+)\)/g, `[$1](${repo}/blob/main/$2)`); // repo links
-
-	const html = inline(smart(marked.parse(body))).replace(
+	const html = inline(smart(marked.parse(post))).replace(
 		/<h([23])>([\s\S]*?)<\/h\1>/g,
 		(_, level, text) => `<h${level} id="${slug(text)}">${text}</h${level}>`
 	);
@@ -142,8 +134,6 @@ export function load() {
 
 	const modified = new Date(touched('.'));
 	return {
-		tagline: smart(head.match(/^\*(.+)\*$/m)[1]),
-		commands: head.match(/```\n([\s\S]*?)```/)[1].trim().split('\n'),
 		html,
 		files,
 		iso: modified.toISOString(),
