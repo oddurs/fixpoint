@@ -14,7 +14,7 @@ while read -r _ local_sha remote_ref _; do
 		if ! git ls-remote --exit-code --heads "$remote" "$default" >/dev/null 2>&1; then
 			continue
 		fi
-		echo "pre-push: $default advances only through a merged pull request (scripts/agent pr)" >&2
+		echo "pre-push: $default advances only through a merged pull request (open a pull request)" >&2
 		exit 1
 	fi
 	case "$local_sha" in *[!0]*) run_check=1 ;; esac # all zeros: a deletion, nothing to check
