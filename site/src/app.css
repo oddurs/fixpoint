@@ -92,6 +92,9 @@ code {
 	   space must stay one column wide, or padded comments drift out of line */
 	word-spacing: normal;
 }
+:not(pre) > code {
+	white-space: nowrap; /* an instruction is one word: never `jmp` here and `short` on the next line */
+}
 
 main {
 	box-sizing: border-box;

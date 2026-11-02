@@ -11,6 +11,5 @@ export default defineConfig({
 			// the stylesheet is small: inline it, so the first paint needs one request
 			inlineStyleThreshold: Infinity
 		})
-	],
-	server: { fs: { allow: ['..'] } }
+	]
 });
