@@ -474,7 +474,11 @@ def anatomy():
 
 def preview():
     image = Image.open(BMP).convert("RGB")
-    image.resize((3 * image.width, 3 * image.height), Image.NEAREST).save(PREVIEW)
+    image = image.resize((3 * image.width, 3 * image.height), Image.NEAREST)
+    # pillow versions compress the same pixels differently; rewrite only a real change
+    if os.path.exists(PREVIEW) and Image.open(PREVIEW).convert("RGB").tobytes() == image.tobytes():
+        return
+    image.save(PREVIEW)
 
 
 if __name__ == "__main__":

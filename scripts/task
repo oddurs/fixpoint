@@ -1,0 +1,80 @@
+#!/bin/sh
+# the seam: the only place that knows how this repo is built and checked.
+# ci, the git hooks and scripts/agent call these verbs and nothing else.
+#
+#   fmt  fmt:check  lint  test  build  check
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+# a .venv made by scripts/setup wins; ci installs into the system python instead
+if [ -x .venv/bin/python ]; then PYTHON=$root/.venv/bin/python; else PYTHON=${PYTHON:-python3}; fi
+export PYTHON
+
+say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
+
+fmt() {
+	# no formatter is configured. adopting one would reformat every file, which is a
+	# decision for the owner, not a side effect of tooling.
+	say "fmt: no formatter configured"
+}
+
+fmt_check() {
+	say "fmt:check: no formatter configured"
+}
+
+lint() {
+	say "lint: byte-compile the python"
+	"$PYTHON" -m py_compile build.py verify.py demo/figures.py demo/record.py
+}
+
+test_() {
+	# the suite is the claims: rebuild from source, require the committed artifacts to
+	# come out byte for byte the same, then check every claim and boot it in qemu
+	say "test: rebuild from source"
+	make -s -B PYTHON="$PYTHON" all
+	say "test: the committed image, stub and figure are exactly what the source builds"
+	git diff --exit-code --stat -- fixpoint.bmp stub.asm docs/anatomy.svg docs/preview.png
+	say "test: check every claim, then boot it"
+	"$PYTHON" verify.py
+}
+
+build() {
+	say "build: the project page"
+	# vite is chatty; show its output only when the build fails
+	log=$(mktemp)
+	if ! make -s PYTHON="$PYTHON" site >"$log" 2>&1; then
+		cat "$log" >&2
+		rm -f "$log"
+		return 1
+	fi
+	rm -f "$log"
+	echo "site/build: $(find site/build -type f | wc -l | tr -d ' ') files" 
+}
+
+check() {
+	start=$(date +%s)
+	# each step runs as its own process: inside an `if`, sh ignores set -e for functions,
+	# so a failure early in a step would be masked by a success later in it
+	self=$root/scripts/task
+	if "$self" fmt:check && "$self" lint && "$self" test && "$self" build; then
+		say "check: pass ($(($(date +%s) - start))s)"
+	else
+		printf '\033[1;31m==> check: FAIL\033[0m\n' >&2
+		exit 1
+	fi
+}
+
+case "${1:-}" in
+fmt) fmt ;;
+fmt:check) fmt_check ;;
+lint) lint ;;
+test) test_ ;;
+build) build ;;
+check) check ;;
+*)
+	echo "usage: scripts/task fmt|fmt:check|lint|test|build|check" >&2
+	exit 2
+	;;
+esac

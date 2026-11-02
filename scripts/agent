@@ -1,0 +1,197 @@
+#!/bin/sh
+# the workflow: one unit of work, one worktree, one branch, one pull request.
+#
+#   doctor              is this checkout ready to work in?
+#   start <type/slug>   a new worktree and branch off the default branch; prints its path
+#   check               scripts/task check
+#   commit <subject> [body]
+#                       stage everything in this worktree and commit; the hooks check it
+#   pr [gh args]        push, open the pull request (--fill unless you pass a title or
+#                       body), and set it to squash-merge itself once ci passes
+#   sync                rebase on the default branch and update the pull request
+#   done [branch]       wait for ci and the merge, watch the deploy, then remove the
+#                       worktree and branch
+#   list                worktrees and open pull requests
+#
+# never cds for the caller: start prints the path, and you go there yourself.
+set -eu
+
+die() { echo "agent: $*" >&2; exit 1; }
+say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
+
+git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git repository"
+main_root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+repo=$(basename "$main_root")
+worktrees=$(dirname "$main_root")/.worktrees/$repo
+default=$(git -C "$main_root" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+if [ -z "$default" ]; then
+	default=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null) ||
+		die "can't resolve the default branch: git remote set-head origin --auto"
+fi
+
+current() { git symbolic-ref --quiet --short HEAD || die "detached HEAD"; }
+on_work_branch() {
+	b=$(current)
+	[ "$b" != "$default" ] || die "on $default, which advances only through a pull request: scripts/agent start <type>/<slug>"
+	echo "$b"
+}
+valid() { echo "$1" | grep -Eq '^(feat|fix|chore|docs|perf|refactor|test)/[a-z0-9][a-z0-9._-]*$'; }
+pr_state() { gh pr view "$1" --json state -q .state 2>/dev/null; }
+
+doctor() {
+	bad=0
+	ok() { echo "  ok    $*"; }
+	no() { echo "  FAIL  $*"; bad=1; }
+	git remote get-url origin >/dev/null 2>&1 && ok "remote origin: $(git remote get-url origin)" || no "no remote named origin"
+	ok "default branch: $default"
+	[ "$(git config core.hooksPath)" = .githooks ] && ok "hooks: .githooks" || no "hooks not wired: scripts/setup"
+	gh auth status >/dev/null 2>&1 && ok "gh: authenticated" || no "gh: not authenticated: gh auth login"
+	for tool in nasm ndisasm qemu-system-i386 node npm make; do
+		command -v "$tool" >/dev/null 2>&1 && ok "$tool" || no "$tool missing: scripts/setup"
+	done
+	py=$(git rev-parse --show-toplevel)/.venv/bin/python
+	[ -x "$py" ] || py=$main_root/.venv/bin/python
+	[ -x "$py" ] || py=python3
+	"$py" -c "import numpy, PIL, matplotlib, fontTools" 2>/dev/null && ok "python requirements ($py)" ||
+		no "python requirements missing: scripts/setup"
+	[ -z "$(git status --porcelain)" ] && ok "tree clean" || echo "  --    tree has changes (fine mid-task)"
+	[ "$bad" = 0 ] || exit 1
+}
+
+start() {
+	[ $# -eq 1 ] || die "usage: scripts/agent start <type>/<slug>"
+	b=$1
+	valid "$b" || die "branch must be <type>/<slug>, type one of: feat fix chore docs perf refactor test"
+	dir=$worktrees/$b
+	if [ -d "$dir" ]; then
+		say "worktree for $b already exists"
+		echo "$dir"
+		return
+	fi
+	say "fetch origin"
+	git -C "$main_root" fetch -q origin
+	if git -C "$main_root" show-ref --verify --quiet "refs/heads/$b"; then
+		say "worktree for the existing branch $b"
+		git -C "$main_root" worktree add -q "$dir" "$b"
+	else
+		# --no-track: the branch must never have the default branch as its upstream,
+		# or a bare `git push` would aim at it
+		say "worktree and branch $b, from origin/$default"
+		git -C "$main_root" worktree add -q --no-track -b "$b" "$dir" "origin/$default"
+	fi
+	# share the python environment instead of building one per worktree
+	[ -e "$main_root/.venv" ] && [ ! -e "$dir/.venv" ] && ln -s "$main_root/.venv" "$dir/.venv"
+	echo "$dir"
+}
+
+check() { "$(git rev-parse --show-toplevel)/scripts/task" check; }
+
+commit() {
+	[ $# -ge 1 ] || die 'usage: scripts/agent commit "<type>(<scope>): <subject>" ["<body>"]'
+	on_work_branch >/dev/null
+	git add -A
+	git diff --cached --quiet && die "nothing to commit"
+	if [ $# -ge 2 ]; then git commit -q -m "$1" -m "$2"; else git commit -q -m "$1"; fi
+	git log --oneline -1
+}
+
+pr() {
+	b=$(on_work_branch)
+	say "push $b"
+	git push -q -u origin "$b"
+	if url=$(gh pr view "$b" --json url -q .url 2>/dev/null); then
+		say "pull request already open: $url"
+	else
+		say "open the pull request"
+		if [ $# -eq 0 ]; then set -- --fill; fi
+		gh pr create --base "$default" --head "$b" "$@"
+	fi
+	say "set it to squash-merge itself when the required check passes"
+	gh pr merge "$b" --auto --squash
+}
+
+sync() {
+	b=$(on_work_branch)
+	say "rebase $b on origin/$default"
+	git fetch -q origin
+	git rebase -q "origin/$default"
+	if git rev-parse --verify --quiet "refs/remotes/origin/$b" >/dev/null; then
+		say "update the pull request"
+		git push -q --force-with-lease origin "$b"
+	fi
+}
+
+done_() {
+	b=${1:-$(on_work_branch)}
+	state=$(pr_state "$b") || die "no pull request for $b"
+	if [ "$state" = OPEN ]; then
+		say "waiting for ci and the merge of $b"
+		while [ "$(pr_state "$b")" = OPEN ]; do
+			# gh exits nonzero until the first check is reported; that means "nothing failed yet"
+			failed=$(gh pr checks "$b" --json name,bucket -q '[.[] | select(.bucket == "fail") | .name] | join(", ")' 2>/dev/null) || failed=""
+			[ -z "$failed" ] || die "checks failed on $b: $failed (gh pr checks $b)"
+			sleep 15
+		done
+		state=$(pr_state "$b")
+	fi
+	[ "$state" = MERGED ] || die "$b is $state, not merged; leaving it alone"
+
+	sha=$(gh pr view "$b" --json mergeCommit -q .mergeCommit.oid)
+	say "merged as ${sha%"${sha#???????}"}; watching the deploy"
+	run=""
+	for _ in $(seq 1 40); do
+		run=$(gh run list --workflow pages --json databaseId,headSha -q ".[] | select(.headSha == \"$sha\") | .databaseId" | head -1)
+		[ -n "$run" ] && break
+		sleep 3
+	done
+	if [ -z "$run" ]; then
+		echo "agent: no pages run for $sha yet; check: gh run list --workflow pages" >&2
+	else
+		gh run watch "$run" --exit-status >/dev/null || die "deploy failed: gh run view $run --log-failed"
+		say "deployed and checked live: $(gh api "repos/{owner}/{repo}/pages" -q .html_url)"
+	fi
+
+	dir=$worktrees/$b
+	if [ -d "$dir" ]; then
+		say "remove the worktree $dir"
+		git -C "$main_root" worktree remove "$dir"
+	fi
+	if git -C "$main_root" show-ref --verify --quiet "refs/heads/$b"; then
+		say "delete the branch $b"
+		git -C "$main_root" branch -q -D "$b" # squash-merged: not an ancestor, so -D
+	fi
+	git -C "$main_root" fetch -q --prune origin
+	if git -C "$main_root" show-ref --verify --quiet "refs/remotes/origin/$b"; then
+		git -C "$main_root" push -q origin --delete "$b"
+	fi
+	if [ "$(git -C "$main_root" symbolic-ref --quiet --short HEAD)" = "$default" ]; then
+		say "fast-forward $default in $main_root"
+		git -C "$main_root" merge -q --ff-only "origin/$default"
+	fi
+	for d in "$(dirname "$dir")" "$worktrees"; do
+		if [ -d "$d" ] && [ -z "$(ls -A "$d")" ]; then rmdir "$d"; fi
+	done
+	case "$PWD" in "$dir"*) echo "you were in the removed worktree: cd $main_root" ;; esac
+}
+
+list() {
+	git -C "$main_root" worktree list
+	gh pr list --state open
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case "$cmd" in
+doctor) doctor ;;
+start) start "$@" ;;
+check) check ;;
+commit) commit "$@" ;;
+pr) pr "$@" ;;
+sync) sync ;;
+done) done_ "$@" ;;
+list) list ;;
+*)
+	sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' >&2
+	exit 2
+	;;
+esac

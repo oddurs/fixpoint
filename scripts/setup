@@ -1,0 +1,35 @@
+#!/bin/sh
+# run once after cloning: wires the git hooks, makes the python environment, and
+# checks the toolchain the build and the checks need.
+set -eu
+
+# the python environment lives in the main checkout; scripts/agent start links it into
+# each worktree, so every worktree shares one
+root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+cd "$root"
+
+git config core.hooksPath .githooks
+echo "hooks: core.hooksPath = .githooks"
+
+if command -v uv >/dev/null 2>&1; then
+	[ -x .venv/bin/python ] || uv venv -q .venv
+	uv pip install -q --python .venv/bin/python -r requirements.txt
+	echo "python: .venv ready ($(.venv/bin/python --version))"
+else
+	echo "python: uv not found; install it, or provide a python3 with: $(tr '\n' ' ' <requirements.txt | sed 's/#[^ ]*//g')" >&2
+fi
+
+missing=0
+for tool in nasm ndisasm qemu-system-i386 node npm gh; do
+	if command -v "$tool" >/dev/null 2>&1; then
+		echo "tool: $tool ok"
+	else
+		echo "tool: $tool MISSING" >&2
+		missing=1
+	fi
+done
+for tool in ffmpeg gdb; do
+	command -v "$tool" >/dev/null 2>&1 && echo "tool: $tool ok" || echo "tool: $tool not found (optional: verify uses ffmpeg when present; make demo needs it and gdb)"
+done
+[ "$missing" = 0 ] || { echo "setup: install the missing tools (macos: brew install nasm qemu node gh)" >&2; exit 1; }
+echo "setup: done"
