@@ -8,6 +8,8 @@ export default defineConfig({
 			adapter: adapter(),
 			// served at the root of fixpoint.oddurs.com. absolute paths, so inlined css finds its fonts
 			paths: { relative: false },
+			// nothing links to the sitemap, so the crawler has to be told about it
+			prerender: { entries: ['*', '/sitemap.xml'] },
 			// the stylesheet is small: inline it, so the first paint needs one request
 			inlineStyleThreshold: Infinity
 		})

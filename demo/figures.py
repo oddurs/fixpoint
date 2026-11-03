@@ -3,6 +3,9 @@
 docs/preview.png  the image, scaled 3x with no smoothing.
 site/static/favicon.png, site/static/apple-touch-icon.png
                   the edge of the light cone, cut from the image, in big pixels.
+site/static/social.png
+                  the link preview: the image at 4x, cropped to 1200x630 with the
+                  program's row along the top edge.
 docs/fieldguide.svg
                   figure 1: the picture at 3x, with a field guide to what's in it,
                   every region computed from the pixels.
@@ -582,6 +585,15 @@ def icons():
         save(image.crop((x, y, x + side, y + side)).resize((side * scale,) * 2, Image.NEAREST), path)
 
 
+SOCIAL = "site/static/social.png"  # 1200x630, the shape every link preview wants
+SOCIAL_CROP = (40, 0, 1240, 630)  # at 4x: columns 10..309, rows 0..157: row 0 on the top edge, both cones below
+
+
+def social():
+    image = Image.open(BMP).convert("RGB")
+    save(image.resize((4 * image.width, 4 * image.height), Image.NEAREST).crop(SOCIAL_CROP), SOCIAL)
+
+
 # ------------------------------------------------------------------ the field guide
 #
 # figure 1: the picture at 3x, with what is in it. every region is computed from the
@@ -824,3 +836,4 @@ if __name__ == "__main__":
     anatomy()
     preview()
     icons()
+    social()
