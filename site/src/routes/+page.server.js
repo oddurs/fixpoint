@@ -8,6 +8,8 @@ import { markedHighlight } from 'marked-highlight';
 import { root, touched } from '../lib/touched.js';
 import post from '../post.md?raw';
 
+const PUBLISHED = '2026-10-31'; // the byline's date: the day the page went up, not the last edit
+
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** nasm the way the listings package sets it: mnemonics bold, labels quiet, comments
@@ -27,7 +29,7 @@ function nasm(code) {
 				escape(gap) +
 				(op && `<b class="op">${op}</b>`) +
 				escape(rest) +
-				(comment && `<span class="com">${escape(comment)}</span>`) +
+				(comment && `<span class="com">${escape(comment).replace(/&amp;/g, '<span class="amp">&amp;</span>')}</span>`) +
 				'</span>'
 			);
 		})
@@ -114,11 +116,12 @@ export function load() {
 	const modified = new Date(touched('.'));
 	return {
 		html,
+		published: PUBLISHED,
 		iso: modified.toISOString(),
-		date: modified
+		date: new Date(PUBLISHED)
 			.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
 			.toLowerCase(),
-		modified: modified.toUTCString().replace('GMT', 'UTC'),
+		modified: modified.toUTCString().replace('GMT', 'UTC').toLowerCase(),
 		video: size('site/static/demo.mp4'),
 		bmp: statSync(root + 'fixpoint.bmp').size.toLocaleString('en-US')
 	};
