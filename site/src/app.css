@@ -156,7 +156,15 @@ main {
 	text-wrap: pretty;
 }
 .aside {
-	margin: 0 0 6px;
+	margin: 20px 0 0;
+	color: var(--grey);
+	font-size: 0.9em;
+	font-style: italic;
+}
+/* a label belongs to what it labels: close below, room above */
+.aside + figure,
+.aside + pre {
+	margin-top: 8px;
 }
 
 /* --- figures may be wider than the text, like figure* in two-column latex */
@@ -308,6 +316,9 @@ pre code {
 	font-size: 1.08em;
 	font-style: italic;
 	line-height: 1; /* a larger face mustn't open up its line */
+}
+.com .amp {
+	font-style: normal; /* the italic ampersand is an "et" ligature; in a formula it reads as a letter */
 }
 .prompt {
 	color: var(--faint);

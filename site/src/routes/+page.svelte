@@ -12,7 +12,6 @@
 	// 155 characters: the most a search result shows whole
 	const description =
 		'a 320×200 bmp that is also a boot sector. boot it and the cpu draws the same picture again: rule 110, seeded by the 130-byte program hiding in its top row.';
-	const published = '2026-10-31';
 	const author = { '@type': 'Person', name: 'Oddur Sigurdsson', url: 'https://github.com/oddurs' };
 	// the link preview is cut from fixpoint.bmp by demo/figures.py
 	const social = {
@@ -36,7 +35,7 @@
 				image: social.url,
 				inLanguage: 'en',
 				author,
-				datePublished: published,
+				datePublished: data.published,
 				dateModified: data.iso,
 				about: { '@id': `${site}#code` }
 			},
@@ -78,7 +77,7 @@
 	<meta property="og:image:width" content={social.width} />
 	<meta property="og:image:height" content={social.height} />
 	<meta property="og:image:alt" content={social.alt} />
-	<meta property="article:published_time" content={published} />
+	<meta property="article:published_time" content={data.published} />
 	<meta property="article:modified_time" content={data.iso} />
 	<meta property="article:author" content={author.url} />
 	<meta name="twitter:card" content="summary_large_image" />
@@ -99,7 +98,7 @@
 <main>
 	<header class="post">
 		<h1><span class="tt">fixpoint</span>: an image that boots and computes itself</h1>
-		<p class="byline">oddur sigurdsson &middot; <time datetime={data.iso}>{data.date}</time></p>
+		<p class="byline">oddur sigurdsson &middot; <time datetime={data.published}>{data.date}</time></p>
 		<p class="tagline">a picture of its own consequences.</p>
 	</header>
 

@@ -321,7 +321,7 @@ def anatomy():
         )
 
     # --- (a) the header
-    o.append(t.runs(X0, Y_HEAD - 32, [("(a)", "cmb10"), ("  Headers, bytes 0–53", "cmr10")], 11.5))
+    o.append(t.runs(X0, Y_HEAD - 32, [("(a)", "cmb10"), ("  headers, bytes 0–53", "cmr10")], 11.5))
     executed = {b for off, n, _ in path for b in range(off, off + n)}
     for off in range(14):
         o.append(
@@ -356,7 +356,7 @@ def anatomy():
         o.append(t.text(hx(off), Y_HEAD + HH + 12, str(off), "cmr10", 8, "middle", GREY))
 
     # --- (b) the palette, up to the end of the boot sector
-    o.append(t.runs(X0, Y_GRID - 34, [("(b)", "cmb10"), ("  Palette, bytes 54–511", "cmr10")], 11.5))
+    o.append(t.runs(X0, Y_GRID - 34, [("(b)", "cmb10"), ("  palette, bytes 54–511", "cmr10")], 11.5))
     for c in range(COLS):
         o.append(t.text(X0 + c * EW + EW / 2, Y_GRID - 7, f"{c:X}", "cmtt10", 9, "middle", GREY))
     o.append(t.text(X0 - 50, Y_GRID - 7, "entry", "cmr10", 9, "middle", GREY))
@@ -456,7 +456,7 @@ def anatomy():
 
     # --- (c) the path, disassembled
     yc = Y_GRID + ROWS * EH + 52
-    o.append(t.runs(X0, yc, [("(c)", "cmb10"), ("  The path, disassembled", "cmr10")], 11.5))
+    o.append(t.runs(X0, yc, [("(c)", "cmb10"), ("  the path, disassembled", "cmr10")], 11.5))
     size = 8.8
     for row in rows:
         row["hex"] = " ".join(f"{data[b]:02X}" for i in row["ins"] for b in range(path[i][0], path[i][0] + path[i][1]))
@@ -514,10 +514,10 @@ def anatomy():
         ycap,
         W - 32,
         [
-            ("Figure 2.", "cmb10"),
-            (" The first 512 bytes of ", "cmr10"),
+            ("figure 2.", "cmb10"),
+            (" the first 512 bytes of ", "cmr10"),
             ("fixpoint.bmp", "cmtt10"),
-            (". (a) The headers. The CPU starts at byte 0: ", "cmr10"),
+            (". (a) the headers. the cpu starts at byte 0: ", "cmr10"),
             ("BM", "cmtt10"),
             (" executes as ", "cmr10"),
             ("inc dx; dec bp", "cmtt10"),
@@ -526,12 +526,12 @@ def anatomy():
             (", ", "cmr10"),
             (f"EB {data[3]:02X}", "cmtt10"),
             (
-                ", are a short jump into the palette. (b) The palette up to byte 512, one swatch per entry, "
-                "drawn in its own colour. The line is the path the CPU takes, traced by disassembling the "
+                ", are a short jump into the palette. (b) the palette up to byte 512, one swatch per entry, "
+                "drawn in its own colour. the line is the path the cpu takes, traced by disassembling the "
                 f"file from byte 0 and following each jump: {len(path)} instructions, {code} bytes of code in "
                 f"{touched} palette entries, and {len(jumps) - 1} short jumps over entries the bootloader leaves "
-                "alone. Outlined: the four partition status bytes and the boot signature, which the disk format "
-                "fixes and the palette absorbs. (c) The same path as instructions, named as in ",
+                "alone. outlined: the four partition status bytes and the boot signature, which the disk format "
+                "fixes and the palette absorbs. (c) the same path as instructions, named as in ",
                 "cmr10",
             ),
             ("stub.asm", "cmtt10"),
@@ -549,7 +549,7 @@ def anatomy():
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
         f'viewBox="0 0 {int(W)} {int(H)}" width="{int(W * 1.25)}" height="{int(H * 1.25)}">\n'
-        "<title>Figure 2: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, "
+        "<title>figure 2: the first 512 bytes of fixpoint.bmp, read as bmp headers and a palette, "
         "with the path the cpu takes through them and its instructions</title>\n"
         f"<style>{''.join(style)}</style>\n"
         f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n{body}\n</svg>\n'
@@ -803,13 +803,13 @@ def fieldguide():
         ycap,
         width,
         [
-            ("Figure 1.", "cmb10"),
+            ("figure 1.", "cmb10"),
             (" ", "cmr10"),
             ("fixpoint.bmp", "cmtt10"),
             (
-                " at three times its size, and a field guide to what's in it. Every region is computed from the "
+                " at three times its size, and a field guide to what's in it. every region is computed from the "
                 "pixels: a pixel counts as reached if it differs from the same rule run on the ether alone. "
-                "Numbered regions are areas; ringed ones are scattered pixels.",
+                "numbered regions are areas; ringed ones are scattered pixels.",
                 "cmr10",
             ),
         ],
@@ -822,7 +822,7 @@ def fieldguide():
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
         f'viewBox="0 0 {int(W)} {int(H)}" width="{int(W)}" height="{int(H)}">\n'
-        "<title>Figure 1: fixpoint.bmp at three times its size, with a field guide to the program, the ether, "
+        "<title>figure 1: fixpoint.bmp at three times its size, with a field guide to the program, the ether, "
         "the light cone and the details hidden in it</title>\n"
         f"<style>{''.join(style)}</style>\n"
         f'<rect width="100%" height="100%" fill="#fff"/>\n<defs>{defs}</defs>\n' + "\n".join(o) + "\n</svg>\n"
