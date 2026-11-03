@@ -2,13 +2,11 @@
 // text, not the readme's: the two say the same thing for different readers and are
 // edited separately. nothing here runs in the browser: the page ships no javascript.
 
-import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
+import { root, touched } from '../lib/touched.js';
 import post from '../post.md?raw';
-
-const root = process.cwd() + '/../'; // the build runs in site/
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -80,13 +78,6 @@ const slug = (s) =>
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-|-$/g, '');
-
-/** the date git last touched a path (the pages workflow fetches full history). a path
-    with no history yet is new: it was last touched now. a git failure fails the build. */
-function touched(path, format = '%cI') {
-	const out = execSync(`git log -1 --format=${format} -- ${path}`, { cwd: root }).toString().trim();
-	return out || new Date().toISOString();
-}
 
 /** a file's size, the way a 2003 directory listing would print it */
 function size(path) {

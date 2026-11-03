@@ -9,24 +9,51 @@
 	const commands = ['qemu-system-i386 -drive format=raw,file=fixpoint.bmp', 'unzip fixpoint.bmp'];
 	const site = 'https://fixpoint.oddurs.com/';
 	const title = 'fixpoint: an image that boots and computes itself';
+	// 155 characters: the most a search result shows whole
 	const description =
-		'a 320×200 bmp that is also a boot sector. boot it and the cpu draws the same picture again: rule 110 in its ether, and the light cone of the 130-byte program hiding in its top row.';
-	const poster = { url: `${site}poster.png`, width: 960, height: 600 };
+		'a 320×200 bmp that is also a boot sector. boot it and the cpu draws the same picture again: rule 110, seeded by the 130-byte program hiding in its top row.';
+	const published = '2026-10-31';
+	const author = { '@type': 'Person', name: 'Oddur Sigurdsson', url: 'https://github.com/oddurs' };
+	// the link preview is cut from fixpoint.bmp by demo/figures.py
+	const social = {
+		url: `${site}social.png`,
+		width: 1200,
+		height: 630,
+		alt: 'fixpoint.bmp magnified: a dark V of woven ether between two coral and plum cones of rule 110 triangles, with the program’s own row along the top edge'
+	};
 
-	// structured data, so search engines know this is source code, by whom, under what license
+	// structured data: a post about a piece of source code, by whom, under what license
 	const ld = {
 		'@context': 'https://schema.org',
-		'@type': 'SoftwareSourceCode',
-		name: 'fixpoint',
-		headline: title,
-		description,
-		url: site,
-		image: poster.url,
-		codeRepository: repo,
-		programmingLanguage: ['Assembly', 'Python'],
-		license: 'https://opensource.org/licenses/MIT',
-		author: { '@type': 'Person', name: 'Oddur Sigurdsson', url: 'https://github.com/oddurs' },
-		dateModified: data.iso
+		'@graph': [
+			{
+				'@type': 'BlogPosting',
+				'@id': `${site}#post`,
+				headline: title,
+				description,
+				url: site,
+				mainEntityOfPage: site,
+				image: social.url,
+				inLanguage: 'en',
+				author,
+				datePublished: published,
+				dateModified: data.iso,
+				about: { '@id': `${site}#code` }
+			},
+			{
+				'@type': 'SoftwareSourceCode',
+				'@id': `${site}#code`,
+				name: 'fixpoint',
+				description,
+				url: site,
+				image: social.url,
+				codeRepository: repo,
+				programmingLanguage: ['Assembly', 'Python'],
+				license: 'https://opensource.org/licenses/MIT',
+				author,
+				dateModified: data.iso
+			}
+		]
 	};
 	const jsonld = `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</` + 'script>';
 </script>
@@ -35,22 +62,30 @@
 	<title>{title}</title>
 	<meta name="description" content={description} />
 	<meta name="author" content="Oddur Sigurdsson" />
+	<meta name="robots" content="index, follow, max-image-preview:large" />
+	<meta name="theme-color" content="#0a0c16" />
 	<link rel="canonical" href={site} />
 	<link rel="preload" href={roman} as="font" type="font/woff2" crossorigin="anonymous" />
 
-	<meta property="og:type" content="website" />
+	<meta property="og:type" content="article" />
+	<meta property="og:locale" content="en_US" />
 	<meta property="og:site_name" content="fixpoint" />
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={site} />
-	<meta property="og:image" content={poster.url} />
-	<meta property="og:image:width" content={poster.width} />
-	<meta property="og:image:height" content={poster.height} />
-	<meta property="og:image:alt" content="a dark V of woven pattern between two bright cones of rule 110 triangles" />
+	<meta property="og:image" content={social.url} />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:width" content={social.width} />
+	<meta property="og:image:height" content={social.height} />
+	<meta property="og:image:alt" content={social.alt} />
+	<meta property="article:published_time" content={published} />
+	<meta property="article:modified_time" content={data.iso} />
+	<meta property="article:author" content={author.url} />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={title} />
 	<meta name="twitter:description" content={description} />
-	<meta name="twitter:image" content={poster.url} />
+	<meta name="twitter:image" content={social.url} />
+	<meta name="twitter:image:alt" content={social.alt} />
 
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- built here from constants, < escaped -->
 	{@html jsonld}
